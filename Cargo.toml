@@ -1,0 +1,13 @@
+[package]
+name = "caolo-bevy-client"
+version = "0.1.0"
+authors = ["Daniel Kiss <littlesnorrboy@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+bevy = "0.3"
+cao-math = { git = "https://github.com/caolo-game/cao-math.git" }
+surf = { version = "2" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
