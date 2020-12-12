@@ -1,5 +1,5 @@
 [package]
-name = "caolo-bevy-client"
+name = "caolo"
 version = "0.1.0"
 authors = ["Daniel Kiss <littlesnorrboy@gmail.com>"]
 edition = "2018"
@@ -11,3 +11,5 @@ cao-math = { git = "https://github.com/caolo-game/cao-math.git" }
 surf = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = "0.2"

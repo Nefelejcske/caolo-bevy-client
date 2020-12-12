@@ -1,12 +1,15 @@
 use bevy::{prelude::*, tasks::IoTaskPool};
+
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+use tracing::debug;
 
 use super::HexPos;
 
 /// Time
+#[derive(Debug, Clone, Copy)]
 pub struct NewRoomState(pub i64);
 
 #[derive(Debug, Clone)]
@@ -59,6 +62,7 @@ pub fn fetch_world(
     timer.0.tick(time.delta_seconds);
 
     if timer.0.finished {
+        debug!("Fetching world");
         let setter = Arc::clone(&setter.0);
         pool.spawn(async move {
             let response: CaoWorldRoomDe =
@@ -75,32 +79,42 @@ pub fn fetch_world(
 
 pub fn set_room(
     new_room: Res<SetRoom>,
+    room: ResMut<CurrentRoom>,
+    new_room_event: ResMut<Events<NewRoomState>>,
+) {
+    if let Some(r) = new_room.0.lock().unwrap().take() {
+        _set_room(r, room, new_room_event);
+    }
+}
+
+fn _set_room(
+    mut r: CaoWorldRoomDe,
     mut room: ResMut<CurrentRoom>,
     mut new_room_event: ResMut<Events<NewRoomState>>,
 ) {
-    if let Some(mut r) = new_room.0.lock().unwrap().take() {
-        if r.time != room.0.time {
-            new_room_event.send(NewRoomState(r.time));
-        }
-        room.0.time = r.time;
-        room.0.bots = r
-            .payload
-            .bots
-            .take()
-            .map(|bots| {
-                bots.into_iter()
-                    .map(|bot| {
-                        let id = bot["__id"].as_i64().unwrap();
-                        (
-                            id,
-                            CaoBot {
-                                pos: serde_json::from_value(bot["pos"].clone()).unwrap(),
-                                id,
-                            },
-                        )
-                    })
-                    .collect()
-            })
-            .unwrap_or_else(Default::default);
+    debug!("Setting new room state");
+
+    if r.time != room.0.time {
+        new_room_event.send(NewRoomState(r.time));
     }
+    room.0.time = r.time;
+    room.0.bots = r
+        .payload
+        .bots
+        .take()
+        .map(|bots| {
+            bots.into_iter()
+                .map(|bot| {
+                    let id = bot["__id"].as_i64().unwrap();
+                    (
+                        id,
+                        CaoBot {
+                            pos: serde_json::from_value(bot["pos"].clone()).unwrap(),
+                            id,
+                        },
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_else(Default::default);
 }
