@@ -66,7 +66,7 @@ pub fn fetch_world(
         let setter = Arc::clone(&setter.0);
         pool.spawn(async move {
             let response: CaoWorldRoomDe =
-                surf::get("https://caolo.herokuapp.com/room-objects?q=16&r=17")
+                surf::get("https://caolo.herokuapp.com/room-objects?q=15&r=18")
                     .recv_json()
                     .await
                     .expect("Failed to get");

@@ -9,8 +9,6 @@ use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
 };
-use tracing::event;
-use tracing::Level;
 
 use self::sim::{
     fetch_world, set_room, CaoEntityId, CaoWorldState, CurrentRoom, FetchWorldTimer, NewRoomState,

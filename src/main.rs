@@ -1,6 +1,5 @@
 mod caosim;
 
-use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin};
 use bevy::prelude::*;
 
 fn setup_tracing() {
@@ -13,7 +12,7 @@ fn setup_tracing() {
 
 fn setup(mut cmd: Commands) {
     cmd.spawn(Camera3dComponents {
-        transform: Transform::from_translation(Vec3::new(-50.0, -50.0, -250.0))
+        transform: Transform::from_translation(Vec3::new(-50.0, 5.0, 100.0))
             .looking_at(Vec3::default(), Vec3::unit_y()),
         ..Default::default()
     });
@@ -26,10 +25,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(TransformPlugin)
         .add_plugin(caosim::CaoSimPlugin)
-        // Adds frame time diagnostics
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
-        // Adds a system that prints diagnostics to the console
-        .add_plugin(PrintDiagnosticsPlugin::default())
         .add_startup_system(setup.system())
+        .add_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
         .run();
 }

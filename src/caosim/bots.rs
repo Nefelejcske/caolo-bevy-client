@@ -56,11 +56,11 @@ pub fn update_current_pos(
             // if too far away just teleport
             current.0 = target.0;
         } else {
-            let diff = diff * time.delta_seconds * 0.5;
+            let diff = (diff * 0.5) * time.delta_seconds;
             current.0 += diff;
         }
 
-        transform.translation = Vec3::new(current.0.x, current.0.y, 0.0);
+        transform.translation = Vec3::new(current.0.x, current.0.y, 0.);
     }
 }
 
@@ -126,7 +126,7 @@ pub fn spawn_bot(
     // Create a new material
     let c = cao_bot.id as f32;
     let material = materials.add(BotMaterial {
-        color: Color::rgb(c.cos(), c.sin(), 0.0),
+        color: Color::rgb(c.cos(), c.sin(), c.tan()),
     });
     cmd.spawn((
         CaoEntityId(cao_bot.id),
@@ -155,7 +155,7 @@ pub fn spawn_bot(
                 ..Default::default()
             },
         )]),
-        transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+        transform: Transform::from_scale(Vec3::new(1., 1., 1.0)),
         ..Default::default()
     })
     .with(material);
