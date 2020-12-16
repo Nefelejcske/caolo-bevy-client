@@ -17,50 +17,21 @@ const BOT_VERTEX_SHADER: &str = include_str!("./bot_vertex.glsl");
 
 use super::{
     sim::{CaoBot, CaoEntityId},
-    Bot, HexPos,
+    Bot, CurrentPos, HexPos,
 };
 
-#[derive(Debug, Clone, Copy)]
-pub struct CurrentPos(pub Vec2);
+pub fn update_current_pos(time: Res<Time>, mut q: Query<(Mut<CurrentPos>, &HexPos)>) {
+    for (mut current, target) in q.iter_mut() {
+        let target = Vec2::new(target.q as f32, target.r as f32);
+        let diff = target - current.0;
 
-impl Default for CurrentPos {
-    fn default() -> Self {
-        Self(Vec2::new(0., 0.))
-    }
-}
-#[derive(Debug, Clone, Copy)]
-pub struct TargetPos(pub Vec2);
-
-impl Default for TargetPos {
-    fn default() -> Self {
-        Self(Vec2::new(0., 0.))
-    }
-}
-
-pub fn update_target_pos(mut q: Query<(Mut<TargetPos>, &HexPos, &Bot)>) {
-    let matrix = axial_to_pixel_mat_pointy();
-    for (mut tp, hex, _) in q.iter_mut() {
-        let p = matrix.right_prod(Vec2::new(hex.q as f32, hex.r as f32));
-        tp.0 = p;
-    }
-}
-
-pub fn update_current_pos(
-    time: Res<Time>,
-    mut q: Query<(Mut<CurrentPos>, Mut<Transform>, &TargetPos)>,
-) {
-    for (mut current, mut transform, target) in q.iter_mut() {
-        let diff = target.0 - current.0;
-
-        if diff.len_sq() > 30. {
+        if diff.len_sq() > 10. {
             // if too far away just teleport
-            current.0 = target.0;
+            current.0 = target;
         } else {
-            let diff = (diff * 0.5) * time.delta_seconds;
+            let diff = (diff * 0.75) * time.delta_seconds;
             current.0 += diff;
         }
-
-        transform.translation = Vec3::new(current.0.x, current.0.y, 0.);
     }
 }
 
@@ -108,7 +79,10 @@ pub fn setup(
         .add_node_edge("bot_material", base::node::MAIN_PASS)
         .unwrap();
 
-    let mesh = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+    let mesh = meshes.add(Mesh::from(shape::Quad {
+        size: bevy::prelude::Vec2::new(3.0f32.sqrt() / 2., 3.0f32.sqrt() / 2.),
+        flip: false,
+    }));
 
     *bot_rendering_assets = resources::BotRenderingAssets {
         mesh,
@@ -125,14 +99,15 @@ pub fn spawn_bot(
     event!(Level::DEBUG, "Spawning new bot, id: {}", cao_bot.id);
     // Create a new material
     let c = cao_bot.id as f32;
+    let s = c.sin();
+    let c = c.cos();
     let material = materials.add(BotMaterial {
-        color: Color::rgb(c.cos(), c.sin(), c.tan()),
+        color: Color::rgb(c, s, c.max(s)),
     });
     cmd.spawn((
         CaoEntityId(cao_bot.id),
         Bot,
         cao_bot.pos.room_pos,
-        TargetPos::default(),
         CurrentPos::default(),
     ))
     .with_bundle(MeshComponents {
@@ -155,7 +130,7 @@ pub fn spawn_bot(
                 ..Default::default()
             },
         )]),
-        transform: Transform::from_scale(Vec3::new(1., 1., 1.0)),
+        transform: Transform::from_scale(Vec3::new(10., 10., 10.)),
         ..Default::default()
     })
     .with(material);

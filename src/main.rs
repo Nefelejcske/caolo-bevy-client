@@ -2,6 +2,8 @@ mod caosim;
 
 use bevy::prelude::*;
 
+pub struct RoomCameraTag;
+
 fn setup_tracing() {
     let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| "info,caolo=debug".to_string());
     let sub = tracing_subscriber::FmtSubscriber::builder()
@@ -11,11 +13,13 @@ fn setup_tracing() {
 }
 
 fn setup(mut cmd: Commands) {
-    cmd.spawn(Camera3dComponents {
-        transform: Transform::from_translation(Vec3::new(-50.0, 5.0, 100.0))
+    // spawn the camera looking at rooms
+    cmd.spawn(Camera2dComponents {
+        transform: Transform::from_translation(Vec3::new(0.0, 0.0, 20.0))
             .looking_at(Vec3::default(), Vec3::unit_y()),
         ..Default::default()
-    });
+    })
+    .with(RoomCameraTag);
 }
 
 fn main() {

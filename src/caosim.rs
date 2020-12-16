@@ -2,6 +2,7 @@
 //!
 mod bots;
 mod sim;
+mod terrain;
 
 use bevy::prelude::*;
 
@@ -22,6 +23,15 @@ pub struct HexPos {
 }
 #[derive(Debug, Clone, Default, Copy)]
 pub struct Bot;
+
+#[derive(Debug, Clone, Copy)]
+pub struct CurrentPos(pub cao_math::vec::vec2::Vec2);
+
+impl Default for CurrentPos {
+    fn default() -> Self {
+        Self(cao_math::vec::vec2::Vec2::new(0., 0.))
+    }
+}
 
 fn on_new_room(
     mut cmd: Commands,
@@ -64,21 +74,37 @@ fn on_new_room(
     }
 }
 
+fn hex_to_world(mut q: Query<(&CurrentPos, Mut<Transform>)>) {
+    let mat = cao_math::hex::axial_to_pixel_mat_pointy();
+    for (current, mut transform) in q.iter_mut() {
+        let current = mat.right_prod(current.0) * 10.;
+        transform.translation = Vec3::new(current.x, current.y, 0.);
+    }
+}
+
 pub struct CaoSimPlugin;
 
 impl Plugin for CaoSimPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_resource(FetchWorldTimer(Timer::from_seconds(1.0, true)))
             .add_resource(SetRoom(Arc::new(Mutex::new(None))))
+            .add_resource(terrain::SetTerrain(Arc::new(Mutex::new(None))))
+            .add_resource(terrain::CurrentTerrain(Default::default()))
             .add_resource(CurrentRoom(CaoWorldState::default()))
             .add_resource(Events::<NewRoomState>::default())
             .add_resource(bots::resources::BotRenderingAssets::default())
+            .add_resource(terrain::resources::TileRenderingAssets::default())
+            .add_resource(Events::<terrain::NewTerrainState>::default())
             .add_asset::<bots::BotMaterial>()
+            .add_asset::<terrain::TerrainMaterial>()
             .add_startup_system(bots::setup.system())
+            .add_startup_system(terrain::setup.system())
             .add_system(fetch_world.system())
             .add_system(on_new_room.system())
-            .add_system(bots::update_target_pos.system())
             .add_system(bots::update_current_pos.system())
+            .add_system(hex_to_world.system())
+            .add_startup_system(terrain::fetch_terrain.system()) // TODO this needs to run on room change..
+            .add_system(terrain::set_terrain.system())
             .add_system(set_room.system());
     }
 }
