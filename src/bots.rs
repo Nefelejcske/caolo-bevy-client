@@ -22,7 +22,7 @@ pub fn spawn_bot(
 ) -> Entity {
     cmd.spawn_bundle(PbrBundle {
         mesh: meshes.add(Mesh::from(shape::Icosphere {
-            radius: 1.0,
+            radius: 0.67,
             subdivisions: 2,
         })),
         material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
