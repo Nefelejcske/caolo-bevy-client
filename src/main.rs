@@ -1,35 +1,31 @@
+mod bots;
 mod caosim;
 
 use bevy::prelude::*;
 
 pub struct RoomCameraTag;
 
-fn setup_tracing() {
-    let filter = std::env::var("RUST_LOG").unwrap_or_else(|_| "info,caolo=debug".to_string());
-    let sub = tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(filter)
-        .finish();
-    tracing::subscriber::set_global_default(sub).unwrap();
-}
+fn setup(mut clear: ResMut<ClearColor>, mut cmd: Commands) {
+    *clear = ClearColor(Color::rgb(0.34, 0.34, 0.34));
 
-fn setup(mut cmd: Commands) {
-    // spawn the camera looking at rooms
-    cmd.spawn(Camera2dComponents {
-        transform: Transform::from_translation(Vec3::new(0.0, 0.0, 20.0))
-            .looking_at(Vec3::default(), Vec3::unit_y()),
-        ..Default::default()
-    })
-    .with(RoomCameraTag);
+    // spawn the camera looking at the world
+    cmd.spawn()
+        .insert_bundle(PerspectiveCameraBundle::new_3d())
+        .insert(
+            Transform::from_translation(Vec3::new(0.0, 0.0, 100.0))
+                .looking_at(caosim::hex_axial_to_pixel(27.0, 40.0).extend(0.0), Vec3::Y),
+        )
+        .insert(RoomCameraTag);
 }
 
 fn main() {
-    setup_tracing();
-
     App::build()
+        .insert_resource(DefaultTaskPoolOptions::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(TransformPlugin)
         .add_plugin(caosim::CaoSimPlugin)
+        .add_plugin(bots::BotsPlugin)
         .add_startup_system(setup.system())
-        .add_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
+        .init_resource::<ClearColor>()
         .run();
 }
