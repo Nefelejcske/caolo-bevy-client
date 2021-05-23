@@ -12,6 +12,8 @@ struct WalkTimer(Timer);
 
 pub struct BotsPlugin;
 
+pub const STEP_TIME: f32 = 0.8;
+
 pub fn spawn_bot(
     cmd: &mut Commands,
     pos: Vec2,
@@ -36,6 +38,11 @@ fn update_transform(mut query: Query<(&CurrentPos, &mut Transform)>) {
     }
 }
 
+fn smoothstep(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
 fn update_pos(
     mut t: ResMut<WalkTimer>,
     time: Res<Time>,
@@ -43,7 +50,8 @@ fn update_pos(
 ) {
     t.0.tick(time.delta());
     let WalkTimer(ref mut t) = &mut *t;
-    let t = t.elapsed_secs();
+    let t = t.elapsed_secs() / STEP_TIME;
+    let t = smoothstep(t);
     for (last, next, mut curr) in query.iter_mut() {
         curr.0 = last.0.lerp(next.0, t);
     }
@@ -56,7 +64,7 @@ fn on_new_entities(mut t: ResMut<WalkTimer>, mut new_entities: EventReader<NewEn
 }
 
 fn setup(mut t: ResMut<WalkTimer>) {
-    t.0 = Timer::from_seconds(1.0, false);
+    t.0 = Timer::from_seconds(STEP_TIME, false);
 }
 
 impl Plugin for BotsPlugin {
