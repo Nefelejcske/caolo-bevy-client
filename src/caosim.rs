@@ -57,8 +57,8 @@ pub fn hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
 fn on_new_entities(
     mut cmd: Commands,
     mut map: ResMut<EntityMaps>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
+    mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
     mut bots: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
 ) {
@@ -81,9 +81,10 @@ fn on_new_entities(
                 let new_id = spawn_bot(
                     &mut cmd,
                     hex_axial_to_pixel(pos.q as f32, pos.r as f32),
-                    &mut *meshes,
-                    &mut *materials,
+                    &*bot_assets,
+                    &mut *bot_materials,
                 );
+
                 curr.insert(cao_id, new_id);
                 debug!("new entity {:?}", bot.id);
             }
