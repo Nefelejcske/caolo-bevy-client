@@ -26,5 +26,7 @@ fn main() {
         .add_plugin(bots::BotsPlugin)
         .add_startup_system(setup.system())
         .init_resource::<ClearColor>()
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
         .run();
 }

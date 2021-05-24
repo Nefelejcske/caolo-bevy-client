@@ -111,7 +111,7 @@ fn send_new_entities(
     *last_time = current_entities.time;
     let current: cao_sim_model::EntitiesPayload = std::mem::take(&mut *current_entities);
     current_entities.time = current.time; // current_entities have been replaced with Default, set the time to current so we don't fire the event again
-    info!("poggies, time: {}", current.time);
+    debug!("Received new state: time: {}", current.time);
     on_new_entities.send(NewEntities(current));
 }
 
