@@ -12,4 +12,5 @@ pub struct BotRenderingAssets {
 #[uuid = "412bddf4-7931-42dd-9d1d-ee654d8c0d22"]
 pub struct BotMaterial {
     pub color: Color,
+    pub time: f32,
 }

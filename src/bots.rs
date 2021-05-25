@@ -27,18 +27,31 @@ pub fn spawn_bot(
 ) -> Entity {
     let material = materials.add(assets::BotMaterial {
         color: Color::rgb(0.2, 0.8, 0.8),
+        time: 0.0,
     });
 
     cmd.spawn_bundle(MeshBundle {
-            mesh: assets.mesh.clone_weak(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![
-                bevy::render::pipeline::RenderPipeline::new(assets.pipeline.clone_weak()),
-            ]),
-            ..Default::default()
-        })
+        mesh: assets.mesh.clone_weak(),
+        render_pipelines: RenderPipelines::from_pipelines(vec![
+            bevy::render::pipeline::RenderPipeline::new(assets.pipeline.clone_weak()),
+        ]),
+        ..Default::default()
+    })
     .insert_bundle((Bot, LastPos(pos), NextPos(pos), CurrentPos(pos)))
     .insert(material)
     .id()
+}
+
+fn update_bot_materials(
+    time: Res<Time>,
+    mut materials: ResMut<Assets<assets::BotMaterial>>,
+    query: Query<&Handle<assets::BotMaterial>>,
+) {
+    query.for_each_mut(move |handle| {
+        if let Some(mat) = materials.get_mut(&*handle) {
+            mat.time = time.seconds_since_startup() as f32;
+        }
+    });
 }
 
 fn update_transform(mut query: Query<(&CurrentPos, &mut Transform)>) {
@@ -134,6 +147,7 @@ impl Plugin for BotsPlugin {
             .add_startup_system(setup.system())
             .add_system(on_new_entities.system())
             .add_system(update_transform.system())
+            .add_system(update_bot_materials.system())
             .init_resource::<assets::BotRenderingAssets>()
             .add_asset::<assets::BotMaterial>()
             .init_resource::<WalkTimer>();
