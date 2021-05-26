@@ -12,6 +12,10 @@ pub struct LastPos(pub Vec2);
 pub struct NextPos(pub Vec2);
 pub struct CurrentPos(pub Vec2);
 
+pub struct LastRotation(pub Quat);
+pub struct NextRotation(pub Quat);
+pub struct CurrentRotation(pub Quat);
+
 #[derive(Debug, Clone, Default)]
 struct WalkTimer(Timer);
 
@@ -30,16 +34,30 @@ pub fn spawn_bot(
         time: 0.0,
     });
 
-    cmd.spawn_bundle(MeshBundle {
-        mesh: assets.mesh.clone_weak(),
-        render_pipelines: RenderPipelines::from_pipelines(vec![
-            bevy::render::pipeline::RenderPipeline::new(assets.pipeline.clone_weak()),
-        ]),
-        ..Default::default()
+    let orient = Quat::default();
+
+    cmd.spawn_bundle((
+        Bot,
+        LastPos(pos),
+        NextPos(pos),
+        CurrentPos(pos),
+        LastRotation(orient),
+        NextRotation(orient),
+        CurrentRotation(orient),
+        Transform::default(),
+        GlobalTransform::default(),
+    ))
+    .with_children(|c| {
+        c.spawn_bundle(MeshBundle {
+            mesh: assets.mesh.clone_weak(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![
+                bevy::render::pipeline::RenderPipeline::new(assets.pipeline.clone_weak()),
+            ]),
+            transform: Transform::default(),
+            ..Default::default()
+        })
+        .insert(material);
     })
-    .insert_bundle((Bot, LastPos(pos), NextPos(pos), CurrentPos(pos)))
-    .insert(material)
-    .insert(Transform::default().looking_at(Vec3::X, Vec3::Z))
     .id()
 }
 
@@ -55,9 +73,10 @@ fn update_bot_materials(
     });
 }
 
-fn update_transform(mut query: Query<(&CurrentPos, &mut Transform)>) {
-    for (CurrentPos(p), mut tr) in query.iter_mut() {
-        tr.translation = p.extend(0.0);
+fn update_transform(mut query: Query<(&CurrentPos, &CurrentRotation, &mut Transform)>) {
+    for (CurrentPos(p), CurrentRotation(q), mut tr) in query.iter_mut() {
+        tr.translation = Vec3::new(p.x, 0.0, p.y);
+        tr.rotation = *q;
     }
 }
 
@@ -77,6 +96,17 @@ fn update_pos(
     let t = smoothstep(t);
     for (last, next, mut curr) in query.iter_mut() {
         curr.0 = last.0.lerp(next.0, t);
+    }
+}
+
+fn update_orient(
+    mut t: ResMut<WalkTimer>,
+    mut query: Query<(&LastRotation, &NextRotation, &mut CurrentRotation), With<Bot>>,
+) {
+    let WalkTimer(ref mut t) = &mut *t;
+    let t = t.elapsed_secs() / STEP_TIME;
+    for (last, next, mut curr) in query.iter_mut() {
+        curr.0 = last.0.slerp(next.0, t);
     }
 }
 
@@ -150,6 +180,7 @@ impl Plugin for BotsPlugin {
             .add_system(on_new_entities.system())
             .add_system(update_transform.system())
             .add_system(update_bot_materials.system())
+            .add_system(update_orient.system())
             .init_resource::<assets::BotRenderingAssets>()
             .add_asset::<assets::BotMaterial>()
             .init_resource::<WalkTimer>();

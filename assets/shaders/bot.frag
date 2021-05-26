@@ -10,12 +10,7 @@ layout(set = 2, binding = 1) uniform BotMaterial_time {
     float Time;
 };
 
-float frag(float f) {
-    return f - floor(f);
-}
-
 void main() {
-    float t = frag(Time) * 0.25;
-    vec2 disp = sin(V_Uv) * 1.2; // + vec2(t, t);
-    o_Target = Color * dot(disp, disp);
+    vec2 disp = V_Uv;
+    o_Target = Color * smoothstep(0., 2.0, dot(disp, disp)) * 2.2;
 }

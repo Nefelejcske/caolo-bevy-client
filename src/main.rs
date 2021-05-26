@@ -8,13 +8,13 @@ pub struct RoomCameraTag;
 fn setup(mut clear: ResMut<ClearColor>, mut cmd: Commands) {
     *clear = ClearColor(Color::rgb(0.34, 0.34, 0.34));
 
+    let map_mid = caosim::hex_axial_to_pixel(25., 25.);
+    let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
+
     // spawn the camera looking at the world
     cmd.spawn()
         .insert_bundle(PerspectiveCameraBundle::new_3d())
-        .insert(
-            Transform::from_translation(Vec3::new(0.0, 0.0, 75.0))
-                .looking_at(caosim::hex_axial_to_pixel(25.0, 25.0).extend(0.0), Vec3::Z),
-        )
+        .insert(Transform::from_translation(Vec3::new(0.0, 75.0, 0.0)).looking_at(map_mid, Vec3::Y))
         .insert(RoomCameraTag);
 }
 

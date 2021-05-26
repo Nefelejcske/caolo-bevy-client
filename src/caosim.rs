@@ -60,7 +60,14 @@ fn on_new_entities(
     bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
-    mut bots: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
+    mut bot_pos: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
+    mut bot_rot: Query<
+        (
+            &mut crate::bots::LastRotation,
+            &mut crate::bots::NextRotation,
+        ),
+        With<Bot>,
+    >,
 ) {
     for new_entities in new_entities.iter() {
         let len = map.caoid2bevy.len();
@@ -72,10 +79,23 @@ fn on_new_entities(
             if let Some(bot_id) = prev.remove(&cao_id) {
                 curr.insert(cao_id, bot_id);
                 debug!("found entity {:?}", bot.id);
-                let (mut last, mut next) =
-                    bots.get_mut(bot_id).expect("Failed to get bot components");
-                last.0 = next.0;
-                next.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+                let (mut last_pos, mut next_pos) = bot_pos
+                    .get_mut(bot_id)
+                    .expect("Failed to get bot components");
+
+                last_pos.0 = next_pos.0;
+                next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+
+                let (mut last_rot, mut next_rot) = bot_rot
+                    .get_mut(bot_id)
+                    .expect("Failed to get bot components");
+                last_rot.0 = next_rot.0;
+                if next_pos.0 != last_pos.0 {
+                    let velocity: Vec2 = (next_pos.0 - last_pos.0).normalize();
+                    next_rot.0 = Quat::from_rotation_y(
+                        -(velocity.dot(Vec2::Y).clamp(-0.999999, 0.999999)).acos(),
+                    );
+                }
             } else {
                 let pos = &bot.pos;
                 let new_id = spawn_bot(
