@@ -39,6 +39,7 @@ pub fn spawn_bot(
     })
     .insert_bundle((Bot, LastPos(pos), NextPos(pos), CurrentPos(pos)))
     .insert(material)
+    .insert(Transform::default().looking_at(Vec3::X, Vec3::Z))
     .id()
 }
 
@@ -130,11 +131,12 @@ fn _setup_bot_rendering(
         .add_node_edge("bot_material", render_graph::base::node::MAIN_PASS)
         .unwrap();
 
-    let mesh = meshes.add(Mesh::from(shape::Icosphere {
+    let mesh = meshes.add(Mesh::from(shape::Capsule {
         radius: 0.67,
-        subdivisions: 8,
+        rings: 1,
+        depth: 1.5,
+        ..Default::default()
     }));
-
     *bot_rendering_assets = assets::BotRenderingAssets {
         mesh,
         pipeline: pipeline_handle,

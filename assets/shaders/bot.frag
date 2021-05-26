@@ -15,7 +15,7 @@ float frag(float f) {
 }
 
 void main() {
-    float t = frag(Time) * 0.5;
-    vec2 disp = sin(V_Uv) + vec2(t, t);
+    float t = frag(Time) * 0.25;
+    vec2 disp = sin(V_Uv) * 1.2; // + vec2(t, t);
     o_Target = Color * dot(disp, disp);
 }

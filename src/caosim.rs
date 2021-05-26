@@ -1,7 +1,7 @@
 //! Components / Systems related to interacting with the remote Simulation
 //!
 
-mod cao_sim_model;
+pub mod cao_sim_model;
 
 use bevy::{prelude::*, tasks::IoTaskPool};
 use tungstenite::connect;
