@@ -12,7 +12,7 @@ fn setup(mut clear: ResMut<ClearColor>, mut cmd: Commands) {
     cmd.spawn()
         .insert_bundle(PerspectiveCameraBundle::new_3d())
         .insert(
-            Transform::from_translation(Vec3::new(0.0, 0.0, 50.0))
+            Transform::from_translation(Vec3::new(0.0, 0.0, 75.0))
                 .looking_at(caosim::hex_axial_to_pixel(25.0, 25.0).extend(0.0), Vec3::Z),
         )
         .insert(RoomCameraTag);
@@ -22,7 +22,6 @@ fn main() {
     App::build()
         .insert_resource(WindowDescriptor {
             title: "Caolo".to_string(),
-            cursor_locked: true,
             ..Default::default()
         })
         .insert_resource(DefaultTaskPoolOptions::default())
