@@ -6,12 +6,7 @@ pub mod cao_sim_model;
 use bevy::{prelude::*, tasks::IoTaskPool};
 use tungstenite::connect;
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
-use crate::bots::{spawn_bot, Bot};
+use std::sync::{Arc, Mutex};
 
 use self::cao_sim_model::AxialPos;
 
@@ -36,11 +31,6 @@ pub struct WsConn(
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SimEntityId(pub i64);
 
-#[derive(Default)]
-struct EntityMaps {
-    caoid2bevy: HashMap<SimEntityId, Entity>,
-}
-
 pub struct NewEntities(pub cao_sim_model::EntitiesPayload);
 
 #[derive(Default)]
@@ -52,68 +42,6 @@ pub fn hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
     const THREE_OVER_TWO: f32 = 1.5;
 
     Vec2::new(q * SQRT3 + r * SQRT3_2, r * THREE_OVER_TWO)
-}
-
-fn on_new_entities(
-    mut cmd: Commands,
-    mut map: ResMut<EntityMaps>,
-    bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
-    mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
-    mut new_entities: EventReader<NewEntities>,
-    mut bot_pos: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
-    mut bot_rot: Query<
-        (
-            &mut crate::bots::LastRotation,
-            &mut crate::bots::NextRotation,
-        ),
-        With<Bot>,
-    >,
-) {
-    for new_entities in new_entities.iter() {
-        let len = map.caoid2bevy.len();
-        let mut prev = std::mem::replace(&mut map.caoid2bevy, HashMap::with_capacity(len));
-        let curr = &mut map.caoid2bevy;
-        curr.clear();
-        for bot in new_entities.0.bots.iter() {
-            let cao_id = SimEntityId(bot.id);
-            if let Some(bot_id) = prev.remove(&cao_id) {
-                curr.insert(cao_id, bot_id);
-                debug!("found entity {:?}", bot.id);
-                let (mut last_pos, mut next_pos) = bot_pos
-                    .get_mut(bot_id)
-                    .expect("Failed to get bot components");
-
-                last_pos.0 = next_pos.0;
-                next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
-
-                let (mut last_rot, mut next_rot) = bot_rot
-                    .get_mut(bot_id)
-                    .expect("Failed to get bot components");
-                last_rot.0 = next_rot.0;
-                if next_pos.0 != last_pos.0 {
-                    let velocity: Vec2 = (next_pos.0 - last_pos.0).normalize();
-                    next_rot.0 = Quat::from_rotation_y(
-                        -(velocity.dot(Vec2::Y).clamp(-0.999999, 0.999999)).acos(),
-                    );
-                }
-            } else {
-                let pos = &bot.pos;
-                let new_id = spawn_bot(
-                    &mut cmd,
-                    hex_axial_to_pixel(pos.q as f32, pos.r as f32),
-                    &*bot_assets,
-                    &mut *bot_materials,
-                );
-
-                curr.insert(cao_id, new_id);
-                debug!("new entity {:?}", bot.id);
-            }
-        }
-        // these entities were not sent in the current tick
-        for (_, dead_entity) in prev {
-            cmd.entity(dead_entity).despawn_recursive();
-        }
-    }
 }
 
 /// Fire NewEntities event and reset current_entities
@@ -151,11 +79,11 @@ fn update_world(conn: Res<WsConn>, pool: Res<IoTaskPool>, current_entities: Res<
                             let msg = serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
                                 .expect("Failed to deserialize msg");
                             match msg {
-                                cao_sim_model::Message::Terrain(terrain) => {
+                                cao_sim_model::Message::Terrain(_terrain) => {
                                     info!("Got terrain");
                                 }
                                 cao_sim_model::Message::Entities(ent) => {
-                                    debug!("New entities, time: {}", ent.time,);
+                                    debug!("New entities, time: {}", ent.time);
                                     let mut current_entities = current_entities.lock().unwrap();
                                     *current_entities = ent;
                                 }
@@ -213,9 +141,7 @@ impl Plugin for CaoSimPlugin {
             .add_event::<NewEntities>()
             .add_system(update_world.system())
             .add_system(send_new_entities.system())
-            .add_system(on_new_entities.system())
             .init_resource::<WsConn>()
-            .init_resource::<EntityMaps>()
             .init_resource::<CurrentEntities>();
     }
 }

@@ -1,11 +1,13 @@
 pub mod assets;
 
+use std::collections::HashMap;
+
 use bevy::{
     prelude::*,
     render::{pipeline::PipelineDescriptor, render_graph},
 };
 
-use crate::caosim::NewEntities;
+use crate::caosim::{NewEntities, SimEntityId, hex_axial_to_pixel};
 
 pub struct Bot;
 pub struct LastPos(pub Vec2);
@@ -19,11 +21,16 @@ pub struct CurrentRotation(pub Quat);
 #[derive(Debug, Clone, Default)]
 struct WalkTimer(Timer);
 
+#[derive(Default)]
+struct EntityMaps {
+    caoid2bevy: HashMap<SimEntityId, Entity>,
+}
+
 pub struct BotsPlugin;
 
 pub const STEP_TIME: f32 = 0.8;
 
-pub fn spawn_bot(
+fn spawn_bot(
     cmd: &mut Commands,
     pos: Vec2,
     assets: &assets::BotRenderingAssets,
@@ -110,9 +117,67 @@ fn update_orient(
     }
 }
 
-fn on_new_entities(mut t: ResMut<WalkTimer>, mut new_entities: EventReader<NewEntities>) {
-    if new_entities.iter().next().is_some() {
-        t.0.reset();
+fn on_new_entities(
+    mut cmd: Commands,
+    mut walk_timer: ResMut<WalkTimer>,
+    mut map: ResMut<EntityMaps>,
+    bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
+    mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
+    mut new_entities: EventReader<NewEntities>,
+    mut bot_pos: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
+    mut bot_rot: Query<
+        (
+            &mut crate::bots::LastRotation,
+            &mut crate::bots::NextRotation,
+        ),
+        With<Bot>,
+    >,
+) {
+    for new_entities in new_entities.iter() {
+        walk_timer.0.reset();
+        let len = map.caoid2bevy.len();
+        let mut prev = std::mem::replace(&mut map.caoid2bevy, HashMap::with_capacity(len));
+        let curr = &mut map.caoid2bevy;
+        curr.clear();
+        for bot in new_entities.0.bots.iter() {
+            let cao_id = SimEntityId(bot.id);
+            if let Some(bot_id) = prev.remove(&cao_id) {
+                curr.insert(cao_id, bot_id);
+                debug!("found entity {:?}", bot.id);
+                let (mut last_pos, mut next_pos) = bot_pos
+                    .get_mut(bot_id)
+                    .expect("Failed to get bot components");
+
+                last_pos.0 = next_pos.0;
+                next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+
+                let (mut last_rot, mut next_rot) = bot_rot
+                    .get_mut(bot_id)
+                    .expect("Failed to get bot components");
+                last_rot.0 = next_rot.0;
+                if next_pos.0 != last_pos.0 {
+                    let velocity: Vec2 = (next_pos.0 - last_pos.0).normalize();
+                    next_rot.0 = Quat::from_rotation_y(
+                        -(velocity.dot(Vec2::Y).clamp(-0.999999, 0.999999)).acos(),
+                    );
+                }
+            } else {
+                let pos = &bot.pos;
+                let new_id = spawn_bot(
+                    &mut cmd,
+                    hex_axial_to_pixel(pos.q as f32, pos.r as f32),
+                    &*bot_assets,
+                    &mut *bot_materials,
+                );
+
+                curr.insert(cao_id, new_id);
+                debug!("new entity {:?}", bot.id);
+            }
+        }
+        // these entities were not sent in the current tick
+        for (_, dead_entity) in prev {
+            cmd.entity(dead_entity).despawn_recursive();
+        }
     }
 }
 
@@ -161,15 +226,10 @@ fn _setup_bot_rendering(
         .add_node_edge("bot_material", render_graph::base::node::MAIN_PASS)
         .unwrap();
 
-    let mesh = meshes.add(Mesh::from(shape::Capsule {
-        radius: 0.67,
-        rings: 1,
-        depth: 1.5,
-        ..Default::default()
-    }));
+    let mesh = meshes.add(Mesh::from(shape::Cube { size: 0.87 }));
     *bot_rendering_assets = assets::BotRenderingAssets {
-        mesh,
         pipeline: pipeline_handle,
+        mesh,
     };
 }
 
@@ -182,6 +242,7 @@ impl Plugin for BotsPlugin {
             .add_system(update_bot_materials.system())
             .add_system(update_orient.system())
             .init_resource::<assets::BotRenderingAssets>()
+            .init_resource::<EntityMaps>()
             .add_asset::<assets::BotMaterial>()
             .init_resource::<WalkTimer>();
     }

@@ -12,5 +12,6 @@ layout(set = 2, binding = 1) uniform BotMaterial_time {
 
 void main() {
     vec2 disp = V_Uv;
-    o_Target = Color * smoothstep(0., 2.0, dot(disp, disp)) * 2.2;
+    vec2 invd = vec2(1., 1.) - disp;
+    o_Target = Color * smoothstep(0., 2.0, dot(disp, disp)) * 2.2 + vec4(invd.rg, 0., 1.);
 }
