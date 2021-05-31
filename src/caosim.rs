@@ -12,21 +12,12 @@ use self::cao_sim_model::AxialPos;
 
 pub struct CaoSimPlugin;
 
+type Ws = tungstenite::WebSocket<
+    tungstenite::stream::Stream<std::net::TcpStream, native_tls::TlsStream<std::net::TcpStream>>,
+>;
+
 #[derive(Default, Clone)]
-pub struct WsConn(
-    pub  Option<
-        Arc<
-            Mutex<
-                tungstenite::WebSocket<
-                    tungstenite::stream::Stream<
-                        std::net::TcpStream,
-                        native_tls::TlsStream<std::net::TcpStream>,
-                    >,
-                >,
-            >,
-        >,
-    >,
-);
+pub struct WsConn(pub Option<Arc<Mutex<Ws>>>);
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SimEntityId(pub i64);
@@ -70,10 +61,7 @@ fn update_world(conn: Res<WsConn>, pool: Res<IoTaskPool>, current_entities: Res<
         pool.0
             .spawn(async move {
                 let mut ws_stream = ws_stream.lock().unwrap();
-                if ws_stream.can_read() {
-                    ws_stream
-                        .write_message(tungstenite::Message::Ping(Vec::new()))
-                        .expect("Failed to ping");
+                if ws_stream.can_write() {
                     match ws_stream.read_message() {
                         Ok(tungstenite::Message::Text(txt)) => {
                             let msg = serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
@@ -89,6 +77,9 @@ fn update_world(conn: Res<WsConn>, pool: Res<IoTaskPool>, current_entities: Res<
                                 }
                             }
                         }
+                        Ok(tungstenite::Message::Pong(_)) => {
+                            trace!("Server pong received")
+                        }
                         Ok(tungstenite::Message::Ping(_)) => {
                             ws_stream
                                 .write_message(tungstenite::Message::Pong(Vec::new()))
@@ -97,40 +88,68 @@ fn update_world(conn: Res<WsConn>, pool: Res<IoTaskPool>, current_entities: Res<
                         Ok(msg) => {
                             debug!("Unexpected message variant {:?}", msg);
                         }
-                        Err(
-                            tungstenite::Error::AlreadyClosed
-                            | tungstenite::Error::ConnectionClosed,
-                        ) => return,
                         Err(err) => {
-                            panic!("Failed to read msg: {}", err);
+                            info!("Connection dropped ({}), reconnecting", err);
+                            *ws_stream = get_connection();
+                            send_current_room(&mut ws_stream, AxialPos { q: 15, r: 15 });
                         }
                     }
+                } else {
+                    info!("Connection dropped, reconnecting");
+                    *ws_stream = get_connection();
+                    send_current_room(&mut ws_stream, AxialPos { q: 15, r: 15 });
                 }
             })
             .detach();
     }
 }
 
-fn setup(mut conn: ResMut<WsConn>, pool: Res<IoTaskPool>) {
+fn get_connection() -> Ws {
     let (ws_stream, _resp) = connect("wss://rt-snorrwe.cloud.okteto.net/object-stream")
         .expect("Failed to connect to object-stream"); // TODO
+    debug!("Successfully connected to object-stream");
+    ws_stream
+}
 
+fn send_current_room(ws_stream: &mut Ws, room: AxialPos) {
+    let initial_pl = serde_json::to_vec(&serde_json::json!({
+        "ty": "room_id",
+        "room_id": room
+    }))
+    .unwrap();
+
+    ws_stream
+        .write_message(tungstenite::Message::Binary(initial_pl))
+        .unwrap();
+}
+
+fn setup(mut conn: ResMut<WsConn>, pool: Res<IoTaskPool>) {
+    if conn
+        .0
+        .as_ref()
+        .map(|ws_stream| {
+            ws_stream
+                .try_lock()
+                .map(|ws_stream| ws_stream.can_read() && ws_stream.can_write())
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    {
+        // connection is valid
+        info!("connection is valid");
+        return;
+    }
+
+    info!("Connecting to game-object steam");
+
+    let ws_stream = get_connection();
     let ws_stream = Arc::new(Mutex::new(ws_stream));
     conn.0 = Some(Arc::clone(&ws_stream));
 
     pool.0
         .spawn(async move {
             let mut ws_stream = ws_stream.lock().unwrap();
-
-            let initial_pl = serde_json::to_vec(&serde_json::json!({
-                "ty": "room_id",
-                "room_id": AxialPos { q: 15, r: 15 }
-            }))
-            .unwrap();
-
-            ws_stream
-                .write_message(tungstenite::Message::Binary(initial_pl))
-                .unwrap();
+            send_current_room(&mut ws_stream, AxialPos { q: 15, r: 15 });
         })
         .detach();
 }

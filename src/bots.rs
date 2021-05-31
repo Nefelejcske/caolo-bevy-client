@@ -4,10 +4,13 @@ use std::collections::HashMap;
 
 use bevy::{
     prelude::*,
-    render::{pipeline::PipelineDescriptor, render_graph},
+    render::{
+        pipeline::{PipelineDescriptor, RenderPipeline},
+        render_graph,
+    },
 };
 
-use crate::caosim::{NewEntities, SimEntityId, hex_axial_to_pixel};
+use crate::caosim::{hex_axial_to_pixel, NewEntities, SimEntityId};
 
 pub struct Bot;
 pub struct LastPos(pub Vec2);
@@ -22,9 +25,7 @@ pub struct CurrentRotation(pub Quat);
 struct WalkTimer(Timer);
 
 #[derive(Default)]
-struct EntityMaps {
-    caoid2bevy: HashMap<SimEntityId, Entity>,
-}
+struct EntityMap(pub HashMap<SimEntityId, Entity>);
 
 pub struct BotsPlugin;
 
@@ -57,9 +58,9 @@ fn spawn_bot(
     .with_children(|c| {
         c.spawn_bundle(MeshBundle {
             mesh: assets.mesh.clone_weak(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![
-                bevy::render::pipeline::RenderPipeline::new(assets.pipeline.clone_weak()),
-            ]),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                assets.pipeline.clone_weak(),
+            )]),
             transform: Transform::default(),
             ..Default::default()
         })
@@ -120,13 +121,14 @@ fn update_orient(
 fn on_new_entities(
     mut cmd: Commands,
     mut walk_timer: ResMut<WalkTimer>,
-    mut map: ResMut<EntityMaps>,
+    mut map: ResMut<EntityMap>,
     bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
-    mut bot_pos: Query<(&mut crate::bots::LastPos, &mut crate::bots::NextPos), With<Bot>>,
-    mut bot_rot: Query<
+    mut bot_q: Query<
         (
+            &mut crate::bots::LastPos,
+            &mut crate::bots::NextPos,
             &mut crate::bots::LastRotation,
             &mut crate::bots::NextRotation,
         ),
@@ -135,32 +137,16 @@ fn on_new_entities(
 ) {
     for new_entities in new_entities.iter() {
         walk_timer.0.reset();
-        let len = map.caoid2bevy.len();
-        let mut prev = std::mem::replace(&mut map.caoid2bevy, HashMap::with_capacity(len));
-        let curr = &mut map.caoid2bevy;
+        let len = map.0.len();
+        let mut prev = std::mem::replace(&mut map.0, HashMap::with_capacity(len));
+        let curr = &mut map.0;
         curr.clear();
         for bot in new_entities.0.bots.iter() {
             let cao_id = SimEntityId(bot.id);
             if let Some(bot_id) = prev.remove(&cao_id) {
                 curr.insert(cao_id, bot_id);
-                debug!("found entity {:?}", bot.id);
-                let (mut last_pos, mut next_pos) = bot_pos
-                    .get_mut(bot_id)
-                    .expect("Failed to get bot components");
-
-                last_pos.0 = next_pos.0;
-                next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
-
-                let (mut last_rot, mut next_rot) = bot_rot
-                    .get_mut(bot_id)
-                    .expect("Failed to get bot components");
-                last_rot.0 = next_rot.0;
-                if next_pos.0 != last_pos.0 {
-                    let velocity: Vec2 = (next_pos.0 - last_pos.0).normalize();
-                    next_rot.0 = Quat::from_rotation_y(
-                        -(velocity.dot(Vec2::Y).clamp(-0.999999, 0.999999)).acos(),
-                    );
-                }
+                trace!("found entity {:?}", bot.id);
+                update_from_to(bot_id, bot, &mut bot_q);
             } else {
                 let pos = &bot.pos;
                 let new_id = spawn_bot(
@@ -171,13 +157,40 @@ fn on_new_entities(
                 );
 
                 curr.insert(cao_id, new_id);
-                debug!("new entity {:?}", bot.id);
+                trace!("new entity {:?}", bot.id);
             }
         }
         // these entities were not sent in the current tick
         for (_, dead_entity) in prev {
             cmd.entity(dead_entity).despawn_recursive();
         }
+    }
+}
+
+fn update_from_to(
+    bot_id: Entity,
+    bot: &crate::caosim::cao_sim_model::Bot,
+    bot_q: &mut Query<
+        (
+            &mut crate::bots::LastPos,
+            &mut crate::bots::NextPos,
+            &mut crate::bots::LastRotation,
+            &mut crate::bots::NextRotation,
+        ),
+        With<Bot>,
+    >,
+) {
+    let (mut last_pos, mut next_pos, mut last_rot, mut next_rot) =
+        bot_q.get_mut(bot_id).expect("Failed to get bot components");
+
+    last_pos.0 = next_pos.0;
+    next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+
+    last_rot.0 = next_rot.0;
+    if next_pos.0 != last_pos.0 {
+        let velocity: Vec2 = (next_pos.0 - last_pos.0).normalize();
+        next_rot.0 =
+            Quat::from_rotation_y(-(velocity.dot(Vec2::Y).clamp(-0.999999, 0.999999)).acos());
     }
 }
 
@@ -242,7 +255,7 @@ impl Plugin for BotsPlugin {
             .add_system(update_bot_materials.system())
             .add_system(update_orient.system())
             .init_resource::<assets::BotRenderingAssets>()
-            .init_resource::<EntityMaps>()
+            .init_resource::<EntityMap>()
             .add_asset::<assets::BotMaterial>()
             .init_resource::<WalkTimer>();
     }
