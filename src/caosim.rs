@@ -2,20 +2,28 @@
 //!
 
 pub mod cao_sim_model;
+pub mod terrain_model;
 
 use bevy::prelude::*;
 use futures::prelude::*;
 
 use std::sync::Arc;
 
-use self::cao_sim_model::AxialPos;
+use self::cao_sim_model::{AxialPos, RoomId, TerrainTy};
 
 pub struct CaoSimPlugin;
+pub struct NewEntities(pub Arc<cao_sim_model::EntitiesPayload>);
+pub struct NewTerrain {
+    pub room_id: RoomId,
+    pub terrain: Arc<Vec<(AxialPos, TerrainTy)>>,
+}
 
 type Ws = async_tungstenite::WebSocketStream<async_tungstenite::tokio::ConnectStream>;
 
 struct NewEntitiesRcv(crossbeam::channel::Receiver<NewEntities>);
 struct MessageSender(crossbeam::channel::Sender<Vec<u8>>);
+
+struct NewTerrainRcv(crossbeam::channel::Receiver<NewTerrain>);
 
 #[derive(Clone)]
 pub struct CaoClient {
@@ -28,6 +36,10 @@ pub struct CaoClient {
         crossbeam::channel::Sender<Vec<u8>>,
         crossbeam::channel::Receiver<Vec<u8>>,
     ),
+    pub on_new_terrain: (
+        crossbeam::channel::Sender<NewTerrain>,
+        crossbeam::channel::Receiver<NewTerrain>,
+    ),
 }
 
 impl CaoClient {
@@ -38,11 +50,13 @@ impl CaoClient {
             .expect("Failed to init tokio runtime");
         let runtime = Arc::new(runtime);
         let on_new_entities = crossbeam::channel::bounded(4);
-        let send_message = crossbeam::channel::bounded(32);
+        let on_new_terrain = crossbeam::channel::bounded(4);
+        let send_message = crossbeam::channel::bounded(64);
         Self {
             runtime,
             on_new_entities,
             send_message,
+            on_new_terrain,
         }
     }
 }
@@ -50,14 +64,18 @@ impl CaoClient {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SimEntityId(pub i64);
 
-pub struct NewEntities(pub Arc<cao_sim_model::EntitiesPayload>);
-
 pub fn hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
     const SQRT3: f32 = 1.732_050_8;
     const SQRT3_2: f32 = 0.866_025_4;
     const THREE_OVER_TWO: f32 = 1.5;
 
     Vec2::new(q * SQRT3 + r * SQRT3_2, r * THREE_OVER_TWO)
+}
+
+fn send_new_terrain(recv: Res<NewTerrainRcv>, mut on_new_terrain: EventWriter<NewTerrain>) {
+    while let Ok(terrain) = recv.0.recv_timeout(std::time::Duration::from_micros(1)) {
+        on_new_terrain.send(terrain);
+    }
 }
 
 /// Fire NewEntities event and reset current_entities
@@ -92,6 +110,7 @@ async fn send_current_room(stream: &mut Ws, room: AxialPos) {
 fn setup(client: ResMut<CaoClient>) {
     let _msg_recv = client.send_message.1.clone();
     let entities_sender = client.on_new_entities.0.clone();
+    let terrain_sender = client.on_new_terrain.0.clone();
 
     client.runtime.spawn(async move {
         loop {
@@ -107,8 +126,19 @@ fn setup(client: ResMut<CaoClient>) {
                         let msg = serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
                             .expect("Failed to deserialize msg");
                         match msg {
-                            cao_sim_model::Message::Terrain(_terrain) => {
+                            cao_sim_model::Message::Terrain(terrain) => {
                                 info!("Got terrain");
+                                let pl = terrain_model::terrain_payload_to_components(
+                                    terrain.tiles.as_slice(),
+                                )
+                                .collect();
+
+                                terrain_sender
+                                    .send(NewTerrain {
+                                        room_id: terrain.room_id,
+                                        terrain: Arc::new(pl),
+                                    })
+                                    .expect("Failed to send new terrain");
                             }
                             cao_sim_model::Message::Entities(ent) => {
                                 debug!("New entities, time: {}", ent.time);
@@ -122,10 +152,11 @@ fn setup(client: ResMut<CaoClient>) {
                         trace!("Server pong received")
                     }
                     Ok(tungstenite::Message::Ping(_)) => {
-                        ws_stream
-                            .send(tungstenite::Message::Pong(Vec::new()))
-                            .await
-                            .expect("failed to pong");
+                        if let Err(err) =
+                            ws_stream.send(tungstenite::Message::Pong(Vec::new())).await
+                        {
+                            error!("Failed to pong {}", err);
+                        }
                     }
                     Ok(msg) => {
                         debug!("Unexpected message variant {:?}", msg);
@@ -144,8 +175,11 @@ impl Plugin for CaoSimPlugin {
         let client = CaoClient::new();
         app.add_startup_system(setup.system())
             .add_event::<NewEntities>()
+            .add_event::<NewTerrain>()
             .add_system(send_new_entities.system())
+            .add_system(send_new_terrain.system())
             .insert_resource(NewEntitiesRcv(client.on_new_entities.1.clone()))
+            .insert_resource(NewTerrainRcv(client.on_new_terrain.1.clone()))
             .insert_resource(MessageSender(client.send_message.0.clone()))
             .insert_resource(client);
     }

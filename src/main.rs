@@ -1,5 +1,6 @@
 mod bots;
 mod caosim;
+mod terrain;
 
 use bevy::prelude::*;
 
@@ -28,9 +29,10 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(caosim::CaoSimPlugin)
         .add_plugin(bots::BotsPlugin)
+        .add_plugin(terrain::TerrainPlugin)
         .add_startup_system(setup.system())
         .init_resource::<ClearColor>()
-        // .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-        // .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
         .run();
 }

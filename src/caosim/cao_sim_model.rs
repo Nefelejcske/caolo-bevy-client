@@ -7,9 +7,26 @@ pub enum Message {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
 #[serde(rename_all = "camelCase")]
-pub struct TerrainPayload {}
+pub struct TerrainPayload {
+    pub room_id: RoomId,
+    pub tiles: Vec<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainTy {
+    Empty,
+    Plain,
+    Wall,
+    Bridge,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomId {
+    pub q: i64,
+    pub r: i64,
+}
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

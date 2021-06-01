@@ -1,4 +1,4 @@
-pub mod assets;
+pub mod bot_assets;
 
 use std::collections::HashMap;
 
@@ -34,10 +34,10 @@ pub const STEP_TIME: f32 = 0.8;
 fn spawn_bot(
     cmd: &mut Commands,
     pos: Vec2,
-    assets: &assets::BotRenderingAssets,
-    materials: &mut Assets<assets::BotMaterial>,
+    assets: &bot_assets::BotRenderingAssets,
+    materials: &mut Assets<bot_assets::BotMaterial>,
 ) -> Entity {
-    let material = materials.add(assets::BotMaterial {
+    let material = materials.add(bot_assets::BotMaterial {
         color: Color::rgb(0.2, 0.8, 0.8),
         time: 0.0,
     });
@@ -71,8 +71,8 @@ fn spawn_bot(
 
 fn update_bot_materials(
     time: Res<Time>,
-    mut materials: ResMut<Assets<assets::BotMaterial>>,
-    query: Query<&Handle<assets::BotMaterial>>,
+    mut materials: ResMut<Assets<bot_assets::BotMaterial>>,
+    query: Query<&Handle<bot_assets::BotMaterial>>,
 ) {
     query.for_each_mut(move |handle| {
         if let Some(mat) = materials.get_mut(&*handle) {
@@ -81,9 +81,14 @@ fn update_bot_materials(
     });
 }
 
+#[inline]
+pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
+    Vec3::new(p.x, 0.0, p.y)
+}
+
 fn update_transform(mut query: Query<(&CurrentPos, &CurrentRotation, &mut Transform)>) {
     for (CurrentPos(p), CurrentRotation(q), mut tr) in query.iter_mut() {
-        tr.translation = Vec3::new(p.x, 0.0, p.y);
+        tr.translation = pos_2d_to_3d(*p);
         tr.rotation = *q;
     }
 }
@@ -122,8 +127,8 @@ fn on_new_entities(
     mut cmd: Commands,
     mut walk_timer: ResMut<WalkTimer>,
     mut map: ResMut<EntityMap>,
-    bot_assets: Res<crate::bots::assets::BotRenderingAssets>,
-    mut bot_materials: ResMut<Assets<crate::bots::assets::BotMaterial>>,
+    bot_assets: Res<crate::bots::bot_assets::BotRenderingAssets>,
+    mut bot_materials: ResMut<Assets<crate::bots::bot_assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
     mut bot_q: Query<
         (
@@ -200,7 +205,7 @@ fn setup(
     pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
     meshes: ResMut<Assets<Mesh>>,
     render_graph: ResMut<render_graph::RenderGraph>,
-    bot_rendering_assets: ResMut<assets::BotRenderingAssets>,
+    bot_rendering_assets: ResMut<bot_assets::BotRenderingAssets>,
 ) {
     t.0 = Timer::from_seconds(STEP_TIME, false);
     _setup_bot_rendering(
@@ -217,7 +222,7 @@ fn _setup_bot_rendering(
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut render_graph: ResMut<render_graph::RenderGraph>,
-    mut bot_rendering_assets: ResMut<assets::BotRenderingAssets>,
+    mut bot_rendering_assets: ResMut<bot_assets::BotRenderingAssets>,
 ) {
     asset_server.watch_for_changes().unwrap();
 
@@ -231,7 +236,7 @@ fn _setup_bot_rendering(
     // Add an AssetRenderResourcesNode to our Render Graph. This will bind BotMaterial resources to our shader
     render_graph.add_system_node(
         "bot_material",
-        render_graph::AssetRenderResourcesNode::<assets::BotMaterial>::new(true),
+        render_graph::AssetRenderResourcesNode::<bot_assets::BotMaterial>::new(true),
     );
 
     // Add a Render Graph edge connecting our new "bot_material" node to the main pass node. This ensures "bot_material" runs before the main pass
@@ -240,7 +245,7 @@ fn _setup_bot_rendering(
         .unwrap();
 
     let mesh = meshes.add(Mesh::from(shape::Cube { size: 0.87 }));
-    *bot_rendering_assets = assets::BotRenderingAssets {
+    *bot_rendering_assets = bot_assets::BotRenderingAssets {
         pipeline: pipeline_handle,
         mesh,
     };
@@ -254,9 +259,9 @@ impl Plugin for BotsPlugin {
             .add_system(update_transform.system())
             .add_system(update_bot_materials.system())
             .add_system(update_orient.system())
-            .init_resource::<assets::BotRenderingAssets>()
+            .init_resource::<bot_assets::BotRenderingAssets>()
             .init_resource::<EntityMap>()
-            .add_asset::<assets::BotMaterial>()
+            .add_asset::<bot_assets::BotMaterial>()
             .init_resource::<WalkTimer>();
     }
 }
