@@ -21,9 +21,8 @@ pub struct NewTerrain {
 type Ws = async_tungstenite::WebSocketStream<async_tungstenite::tokio::ConnectStream>;
 
 struct NewEntitiesRcv(crossbeam::channel::Receiver<NewEntities>);
-struct MessageSender(crossbeam::channel::Sender<Vec<u8>>);
-
 struct NewTerrainRcv(crossbeam::channel::Receiver<NewTerrain>);
+struct MessageSender(crossbeam::channel::Sender<Vec<u8>>);
 
 #[derive(Clone)]
 pub struct CaoClient {

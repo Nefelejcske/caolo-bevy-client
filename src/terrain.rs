@@ -13,13 +13,13 @@ use crate::caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain};
 
 pub struct TerrainPlugin;
 
-pub struct TerrainTile(pub TerrainTy);
+pub struct Room;
 
 fn terrain2color(ty: TerrainTy) -> Color {
     match ty {
-        TerrainTy::Empty => Color::rgb(0.0, 0.0, 0.0),
-        TerrainTy::Plain => Color::rgb(0.5, 0.5, 0.0),
-        TerrainTy::Wall => Color::rgb(0.8, 0.0, 0.0),
+        TerrainTy::Empty => Color::rgba(0.0, 0.0, 0.0, 0.0),
+        TerrainTy::Plain => Color::rgb(0.4, 0.3, 0.0),
+        TerrainTy::Wall => Color::rgb(0.5, 0.1, 0.0),
         TerrainTy::Bridge => Color::rgb(0.0, 0.8, 0.0),
     }
 }
@@ -29,7 +29,8 @@ fn on_new_terrain(
     mut new_terrain: EventReader<NewTerrain>,
     assets: Res<terrain_assets::TerrainRenderingAssets>,
     mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
-    existing_tiles: Query<Entity, With<TerrainTile>>,
+    existing_tiles: Query<Entity, With<Room>>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for new_terrain in new_terrain.iter() {
         info!("Poggies {:?}", new_terrain.room_id);
@@ -39,33 +40,77 @@ fn on_new_terrain(
             cmd.entity(e).despawn_recursive();
         }
 
-        for (hex_pos, ty) in new_terrain.terrain.iter() {
-            let pos = hex_axial_to_pixel(hex_pos.q as f32, hex_pos.r as f32);
-            let mut pos = pos_2d_to_3d(pos);
-            pos.y -= 1.0;
+        let mut vertices = Vec::with_capacity(new_terrain.terrain.len() * 6);
+        let mut indices = Vec::with_capacity(new_terrain.terrain.len() * 6);
+        let mut colors = Vec::with_capacity(new_terrain.terrain.len() * 6);
+        for (p, ty) in new_terrain.terrain.iter() {
+            let p = &p;
+            let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
+            let mut p = pos_2d_to_3d(p);
+            p.y -= 1.0;
 
-            let material = materials.add(terrain_assets::TerrainMaterial {
-                color: terrain2color(*ty),
-            });
+            const SQRT3: f32 = 1.732_050_8;
+            const W: f32 = SQRT3;
+            const H: f32 = 2.0;
 
-            cmd.spawn_bundle(MeshBundle {
-                mesh: assets.mesh.clone_weak(),
-                render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                    assets.pipeline.clone_weak(),
-                )]),
-                transform: Transform::from_translation(pos),
-                ..Default::default()
-            })
-            .insert(material)
-            .insert(TerrainTile(*ty));
+            let color = terrain2color(*ty);
+
+            let vertex0ind = vertices.len() as u16;
+            for offset in [
+                Vec2::new(0., -H / 2.),
+                Vec2::new(W / 2., -H / 4.),
+                Vec2::new(W / 2., H / 4.),
+                Vec2::new(0., H / 2.),
+                Vec2::new(-W / 2., H / 4.),
+                Vec2::new(-W / 2., -H / 4.),
+            ]
+            .iter()
+            {
+                let p = p + pos_2d_to_3d(*offset);
+                vertices.push([p.x, p.y, p.z]);
+                colors.push([color.r(), color.g(), color.b(), color.a()]);
+            }
+            // side triangle 0
+            indices.push(vertex0ind + 2);
+            indices.push(vertex0ind + 1);
+            indices.push(vertex0ind + 0);
+            // side triangle 1
+            indices.push(vertex0ind + 4);
+            indices.push(vertex0ind + 3);
+            indices.push(vertex0ind + 2);
+            // side triangle 2
+            indices.push(vertex0ind + 0);
+            indices.push(vertex0ind + 5);
+            indices.push(vertex0ind + 4);
+            // center triangle
+            indices.push(vertex0ind + 4);
+            indices.push(vertex0ind + 2);
+            indices.push(vertex0ind + 0);
         }
+        let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+        mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
+
+        let mesh = meshes.add(mesh);
+
+        let material = materials.add(terrain_assets::TerrainMaterial {});
+
+        cmd.spawn_bundle(MeshBundle {
+            mesh,
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                assets.pipeline.clone_weak(),
+            )]),
+            ..Default::default()
+        })
+        .insert(material)
+        .insert(Room);
     }
 }
 
 fn setup(
     asset_server: Res<AssetServer>,
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut render_graph: ResMut<render_graph::RenderGraph>,
     mut terrain_rendering_assets: ResMut<terrain_assets::TerrainRenderingAssets>,
 ) {
@@ -89,10 +134,8 @@ fn setup(
         .add_node_edge("terrain_material", render_graph::base::node::MAIN_PASS)
         .unwrap();
 
-    let mesh = meshes.add(Mesh::from(shape::Plane { size: 1.4 }));
     *terrain_rendering_assets = terrain_assets::TerrainRenderingAssets {
         pipeline: pipeline_handle,
-        mesh,
     };
 }
 
