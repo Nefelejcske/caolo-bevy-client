@@ -49,8 +49,7 @@ fn on_new_terrain(
             let mut p = pos_2d_to_3d(p);
             p.y -= 1.0;
 
-            const SQRT3: f32 = 1.732_050_8;
-            const W: f32 = SQRT3;
+            const W: f32 = 1.732_050_8; // sqrt (3)
             const H: f32 = 2.0;
 
             let color = terrain2color(*ty);

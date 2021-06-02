@@ -32,7 +32,7 @@ fn main() {
         .add_plugin(terrain::TerrainPlugin)
         .add_startup_system(setup.system())
         .init_resource::<ClearColor>()
-        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-        .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
+        // .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
+        // .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
         .run();
 }
