@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::prelude::*;
 
 use crate::caosim;
@@ -9,6 +11,7 @@ pub struct RoomCameraRigTag;
 
 struct TargetRotation(Quat);
 struct Velocity(f32);
+struct DefaultPosition(Vec3);
 
 fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
     for (mut tr, rot) in cam_rigs.iter_mut() {
@@ -19,9 +22,17 @@ fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
 fn rig_input_system(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut cam_rigs: Query<(&mut Transform, &mut TargetRotation, &Velocity), With<RoomCameraRigTag>>,
+    mut cam_rigs: Query<
+        (
+            &mut Transform,
+            &mut TargetRotation,
+            &Velocity,
+            &DefaultPosition,
+        ),
+        With<RoomCameraRigTag>,
+    >,
 ) {
-    for (mut tr, mut rot, v) in cam_rigs.iter_mut() {
+    for (mut tr, mut rot, v, default_pos) in cam_rigs.iter_mut() {
         let mut dtranslation = Vec3::ZERO;
 
         let sideways = tr.local_x();
@@ -36,16 +47,10 @@ fn rig_input_system(
                 KeyCode::S => dtranslation -= forward,
                 KeyCode::D => dtranslation -= sideways,
                 KeyCode::A => dtranslation += sideways,
-                KeyCode::Space => tr.translation = Vec3::ZERO,
+                KeyCode::Space => tr.translation = default_pos.0,
                 // rotation
-                KeyCode::E => {
-                    drotation =
-                        drotation.mul_quat(Quat::from_rotation_y(std::f32::consts::TAU / 6.0))
-                }
-                KeyCode::Q => {
-                    drotation =
-                        drotation.mul_quat(Quat::from_rotation_y(std::f32::consts::TAU / -6.0))
-                }
+                KeyCode::E => drotation = drotation.mul_quat(Quat::from_rotation_y(TAU / 6.0)),
+                KeyCode::Q => drotation = drotation.mul_quat(Quat::from_rotation_y(TAU / -6.0)),
                 _ => {}
             }
         }
@@ -75,6 +80,7 @@ fn setup(mut cmd: Commands) {
             outertr,
             GlobalTransform::default(),
             TargetRotation(outertr.rotation.clone()),
+            DefaultPosition(outertr.translation),
         ))
         .with_children(move |c| {
             c.spawn()
