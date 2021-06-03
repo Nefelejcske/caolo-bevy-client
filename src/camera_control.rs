@@ -38,7 +38,7 @@ fn rig_input_system(
         let sideways = tr.local_x();
         let forward = tr.local_z();
 
-        let mut drotation = Quat::IDENTITY;
+        let mut drot = Quat::IDENTITY;
 
         for key in keyboard_input.get_pressed() {
             match key {
@@ -47,16 +47,17 @@ fn rig_input_system(
                 KeyCode::S => dtranslation -= forward,
                 KeyCode::D => dtranslation -= sideways,
                 KeyCode::A => dtranslation += sideways,
+                // reset translation
                 KeyCode::Space => tr.translation = default_pos.0,
                 // rotation
-                KeyCode::E => drotation = drotation.mul_quat(Quat::from_rotation_y(TAU / 6.0)),
-                KeyCode::Q => drotation = drotation.mul_quat(Quat::from_rotation_y(TAU / -6.0)),
+                KeyCode::E => drot = drot.mul_quat(Quat::from_rotation_y(TAU / 6.0)),
+                KeyCode::Q => drot = drot.mul_quat(Quat::from_rotation_y(TAU / -6.0)),
                 _ => {}
             }
         }
 
         tr.translation += dtranslation.normalize_or_zero() * v.0 * time.delta_seconds();
-        rot.0 = rot.0.mul_quat(drotation);
+        rot.0 = rot.0.mul_quat(drot);
     }
 }
 
@@ -72,7 +73,6 @@ fn setup(mut cmd: Commands) {
     innertr.translation.y = 75.0;
     innertr.translation.z = -75.0;
 
-    // spawn the camera looking at the world
     cmd.spawn()
         .insert_bundle((
             Velocity(50.0),
