@@ -24,27 +24,30 @@ fn terrain2color(ty: TerrainTy) -> Color {
     }
 }
 
-fn build_flat_hexes(
+fn _build_hex_prism_bases(
     ys: &[f32],
     p: Vec3,
     color: Color,
+    size: f32,
     vertices: &mut Vec<[f32; 3]>,
     indices: &mut Vec<u16>,
     colors: &mut Vec<[f32; 4]>,
+    normals: &mut Vec<[f32; 3]>,
 ) {
-    const W: f32 = 1.732_050_8; // sqrt (3)
-    const H: f32 = 2.0;
+    const SQRT3: f32 = 1.732_050_8; // sqrt (3)
+    let w: f32 = SQRT3 * size;
+    let h: f32 = 2.0 * size;
     for y in ys {
         // flat hexagons
         //
         let vertex0ind = vertices.len() as u16;
         for offset in [
-            Vec2::new(0., -H / 2.),
-            Vec2::new(W / 2., -H / 4.),
-            Vec2::new(W / 2., H / 4.),
-            Vec2::new(0., H / 2.),
-            Vec2::new(-W / 2., H / 4.),
-            Vec2::new(-W / 2., -H / 4.),
+            Vec2::new(0., -h / 2.),
+            Vec2::new(w / 2., -h / 4.),
+            Vec2::new(w / 2., h / 4.),
+            Vec2::new(0., h / 2.),
+            Vec2::new(-w / 2., h / 4.),
+            Vec2::new(-w / 2., -h / 4.),
         ]
         .iter()
         {
@@ -69,6 +72,53 @@ fn build_flat_hexes(
         indices.push(vertex0ind + 2);
         indices.push(vertex0ind + 0);
     }
+    if ys.len() != 1 {
+        for y in ys {
+            normals.extend(
+                [
+                    Vec3::new(0., *y, 1.).normalize(),
+                    Vec3::new(-0.5, *y, -1.).normalize(),
+                    Vec3::new(-0.5, *y, 1.).normalize(),
+                    Vec3::new(0., *y, -1.).normalize(),
+                    Vec3::new(0.5, *y, 1.).normalize(),
+                    Vec3::new(0.5, *y, -1.).normalize(),
+                ]
+                .iter()
+                .map(|v| [v.x, v.y, v.z]),
+            );
+        }
+    } else {
+        normals.extend(
+            [
+                Vec3::new(0., 0., 1.).normalize(),
+                Vec3::new(0., 0., -1.).normalize(),
+                Vec3::new(0., 0., 1.).normalize(),
+                Vec3::new(0., 0., 1.).normalize(),
+                Vec3::new(0., 0., 1.).normalize(),
+                Vec3::new(0., 0., -1.).normalize(),
+            ]
+            .iter()
+            .map(|v| [v.x, v.y, v.z]),
+        );
+    }
+}
+
+/// assumes that the 16 vertices of the two base hexes are contigous, in clockwise order
+fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
+    for i in 0..6 {
+        let a1 = i + 0;
+        let b1 = (i + 1) % 6;
+        let a2 = a1 + 6;
+        let b2 = b1 + 6;
+
+        indices.push(vertex0ind + a1);
+        indices.push(vertex0ind + b1);
+        indices.push(vertex0ind + a2);
+
+        indices.push(vertex0ind + b1);
+        indices.push(vertex0ind + b2);
+        indices.push(vertex0ind + a2);
+    }
 }
 
 fn on_new_terrain(
@@ -81,6 +131,7 @@ fn on_new_terrain(
 ) {
     for new_terrain in new_terrain.iter() {
         info!("Poggies {:?}", new_terrain.room_id);
+        let start = std::time::Instant::now();
 
         for e in existing_tiles.iter() {
             // TODO: maybe update these instead of despawning all...?
@@ -90,6 +141,7 @@ fn on_new_terrain(
         let mut vertices = Vec::with_capacity(new_terrain.terrain.len() * 6);
         let mut indices = Vec::with_capacity(new_terrain.terrain.len() * 6);
         let mut colors = Vec::with_capacity(new_terrain.terrain.len() * 6);
+        let mut normals = Vec::with_capacity(new_terrain.terrain.len() * 6);
         for (p, ty) in new_terrain.terrain.iter() {
             let p = &p;
             let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
@@ -99,35 +151,32 @@ fn on_new_terrain(
             let color = terrain2color(*ty);
 
             let ys: &[f32] = match *ty {
-                TerrainTy::Wall => &[-1., 1.],
+                TerrainTy::Wall => &[-1., 0.34],
                 _ => &[-1.],
             };
             let l = ys.len();
             let vertex0ind = vertices.len() as u16;
 
-            build_flat_hexes(ys, p, color, &mut vertices, &mut indices, &mut colors);
+            _build_hex_prism_bases(
+                ys,
+                p,
+                color,
+                0.95,
+                &mut vertices,
+                &mut indices,
+                &mut colors,
+                &mut normals,
+            );
 
-            // hexagon vertical sides
+            debug_assert!(l <= 2);
             if l == 2 {
-                for i in 0..6 {
-                    let a1 = i + 0;
-                    let b1 = (i + 1) % 6;
-                    let a2 = a1 + 6;
-                    let b2 = b1 + 6;
-
-                    indices.push(vertex0ind + a1);
-                    indices.push(vertex0ind + b1);
-                    indices.push(vertex0ind + a2);
-
-                    indices.push(vertex0ind + b1);
-                    indices.push(vertex0ind + b2);
-                    indices.push(vertex0ind + a2);
-                }
+                _build_hex_prism_sides(vertex0ind, &mut indices);
             }
         }
         let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
 
         let mesh = meshes.add(mesh);
@@ -143,6 +192,10 @@ fn on_new_terrain(
         })
         .insert(material)
         .insert(Room);
+        let end = std::time::Instant::now();
+
+        let dur = end - start;
+        info!("New terrain processing done in {:?}", dur);
     }
 }
 

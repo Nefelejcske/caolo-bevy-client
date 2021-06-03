@@ -2,7 +2,9 @@
 
 layout(location = 0) in vec3 Vertex_Position;
 layout(location = 1) in vec4 Vertex_Color;
+layout(location = 2) in vec3 Vertex_Normal;
 layout(location = 0) out vec4 V_Color;
+layout(location = 1) out vec3 V_Norm;
 
 layout(set = 0, binding = 0) uniform CameraViewProj {
     mat4 ViewProj;
@@ -15,4 +17,5 @@ layout(set = 1, binding = 0) uniform Transform {
 void main() {
     gl_Position = ViewProj * Model * vec4(Vertex_Position, 1.0);
     V_Color = Vertex_Color;
+    V_Norm = Vertex_Normal;
 }
