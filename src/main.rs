@@ -1,21 +1,9 @@
 mod bots;
+mod camera_control;
 mod caosim;
 mod terrain;
 
 use bevy::prelude::*;
-
-pub struct RoomCameraTag;
-
-fn setup(mut cmd: Commands) {
-    let map_mid = caosim::hex_axial_to_pixel(25., 25.);
-    let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
-
-    // spawn the camera looking at the world
-    cmd.spawn()
-        .insert_bundle(PerspectiveCameraBundle::new_3d())
-        .insert(Transform::from_translation(Vec3::new(0.0, 75.0, 0.0)).looking_at(map_mid, Vec3::Y))
-        .insert(RoomCameraTag);
-}
 
 fn main() {
     App::build()
@@ -28,7 +16,7 @@ fn main() {
         .add_plugin(caosim::CaoSimPlugin)
         .add_plugin(bots::BotsPlugin)
         .add_plugin(terrain::TerrainPlugin)
-        .add_startup_system(setup.system())
+        .add_plugin(camera_control::CameraControlPlugin)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         // .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         // .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
