@@ -24,6 +24,53 @@ fn terrain2color(ty: TerrainTy) -> Color {
     }
 }
 
+fn build_flat_hexes(
+    ys: &[f32],
+    p: Vec3,
+    color: Color,
+    vertices: &mut Vec<[f32; 3]>,
+    indices: &mut Vec<u16>,
+    colors: &mut Vec<[f32; 4]>,
+) {
+    const W: f32 = 1.732_050_8; // sqrt (3)
+    const H: f32 = 2.0;
+    for y in ys {
+        // flat hexagons
+        //
+        let vertex0ind = vertices.len() as u16;
+        for offset in [
+            Vec2::new(0., -H / 2.),
+            Vec2::new(W / 2., -H / 4.),
+            Vec2::new(W / 2., H / 4.),
+            Vec2::new(0., H / 2.),
+            Vec2::new(-W / 2., H / 4.),
+            Vec2::new(-W / 2., -H / 4.),
+        ]
+        .iter()
+        {
+            let p = p + pos_2d_to_3d(*offset);
+            vertices.push([p.x, *y, p.z]);
+            colors.push([color.r(), color.g(), color.b(), color.a()]);
+        }
+        // side triangle 0
+        indices.push(vertex0ind + 2);
+        indices.push(vertex0ind + 1);
+        indices.push(vertex0ind + 0);
+        // side triangle 1
+        indices.push(vertex0ind + 4);
+        indices.push(vertex0ind + 3);
+        indices.push(vertex0ind + 2);
+        // side triangle 2
+        indices.push(vertex0ind + 0);
+        indices.push(vertex0ind + 5);
+        indices.push(vertex0ind + 4);
+        // center triangle
+        indices.push(vertex0ind + 4);
+        indices.push(vertex0ind + 2);
+        indices.push(vertex0ind + 0);
+    }
+}
+
 fn on_new_terrain(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
@@ -49,42 +96,34 @@ fn on_new_terrain(
             let mut p = pos_2d_to_3d(p);
             p.y -= 1.0;
 
-            const W: f32 = 1.732_050_8; // sqrt (3)
-            const H: f32 = 2.0;
-
             let color = terrain2color(*ty);
 
+            let ys: &[f32] = match *ty {
+                TerrainTy::Wall => &[-1., 1.],
+                _ => &[-1.],
+            };
+            let l = ys.len();
             let vertex0ind = vertices.len() as u16;
-            for offset in [
-                Vec2::new(0., -H / 2.),
-                Vec2::new(W / 2., -H / 4.),
-                Vec2::new(W / 2., H / 4.),
-                Vec2::new(0., H / 2.),
-                Vec2::new(-W / 2., H / 4.),
-                Vec2::new(-W / 2., -H / 4.),
-            ]
-            .iter()
-            {
-                let p = p + pos_2d_to_3d(*offset);
-                vertices.push([p.x, p.y, p.z]);
-                colors.push([color.r(), color.g(), color.b(), color.a()]);
+
+            build_flat_hexes(ys, p, color, &mut vertices, &mut indices, &mut colors);
+
+            // hexagon vertical sides
+            if l == 2 {
+                for i in 0..6 {
+                    let a1 = i + 0;
+                    let b1 = (i + 1) % 6;
+                    let a2 = a1 + 6;
+                    let b2 = b1 + 6;
+
+                    indices.push(vertex0ind + a1);
+                    indices.push(vertex0ind + b1);
+                    indices.push(vertex0ind + a2);
+
+                    indices.push(vertex0ind + b1);
+                    indices.push(vertex0ind + b2);
+                    indices.push(vertex0ind + a2);
+                }
             }
-            // side triangle 0
-            indices.push(vertex0ind + 2);
-            indices.push(vertex0ind + 1);
-            indices.push(vertex0ind + 0);
-            // side triangle 1
-            indices.push(vertex0ind + 4);
-            indices.push(vertex0ind + 3);
-            indices.push(vertex0ind + 2);
-            // side triangle 2
-            indices.push(vertex0ind + 0);
-            indices.push(vertex0ind + 5);
-            indices.push(vertex0ind + 4);
-            // center triangle
-            indices.push(vertex0ind + 4);
-            indices.push(vertex0ind + 2);
-            indices.push(vertex0ind + 0);
         }
         let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);

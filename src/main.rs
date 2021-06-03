@@ -6,9 +6,7 @@ use bevy::prelude::*;
 
 pub struct RoomCameraTag;
 
-fn setup(mut clear: ResMut<ClearColor>, mut cmd: Commands) {
-    *clear = ClearColor(Color::rgb(0.34, 0.34, 0.34));
-
+fn setup(mut cmd: Commands) {
     let map_mid = caosim::hex_axial_to_pixel(25., 25.);
     let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
 
@@ -31,7 +29,7 @@ fn main() {
         .add_plugin(bots::BotsPlugin)
         .add_plugin(terrain::TerrainPlugin)
         .add_startup_system(setup.system())
-        .init_resource::<ClearColor>()
+        .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         // .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         // .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
         .run();
