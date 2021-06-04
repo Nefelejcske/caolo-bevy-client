@@ -13,6 +13,11 @@ struct TargetRotation(Quat);
 struct Velocity(f32);
 struct DefaultPosition(Vec3);
 
+struct RotationCooldown {
+    cooling: bool,
+    t: Timer,
+}
+
 fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
     for (mut tr, rot) in cam_rigs.iter_mut() {
         tr.rotation = tr.rotation.slerp(rot.0, 0.5);
@@ -20,6 +25,7 @@ fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
 }
 
 fn rig_input_system(
+    mut rot_cd: ResMut<RotationCooldown>,
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     mut cam_rigs: Query<
@@ -32,6 +38,10 @@ fn rig_input_system(
         With<RoomCameraRigTag>,
     >,
 ) {
+    rot_cd.t.tick(time.delta());
+    if rot_cd.t.just_finished() {
+        rot_cd.cooling = false;
+    }
     for (mut tr, mut rot, v, default_pos) in cam_rigs.iter_mut() {
         let mut dtranslation = Vec3::ZERO;
 
@@ -39,6 +49,7 @@ fn rig_input_system(
         let forward = tr.local_z();
 
         let mut drot = Quat::IDENTITY;
+        let mut rotated = false;
 
         for key in keyboard_input.get_pressed() {
             match key {
@@ -50,14 +61,24 @@ fn rig_input_system(
                 // reset translation
                 KeyCode::Space => tr.translation = default_pos.0,
                 // rotation
-                KeyCode::E => drot = drot.mul_quat(Quat::from_rotation_y(TAU / 6.0)),
-                KeyCode::Q => drot = drot.mul_quat(Quat::from_rotation_y(TAU / -6.0)),
+                KeyCode::E if !rot_cd.cooling => {
+                    rotated = true;
+                    drot = drot.mul_quat(Quat::from_rotation_y(TAU / 6.0))
+                }
+                KeyCode::Q if !rot_cd.cooling => {
+                    rotated = true;
+                    drot = drot.mul_quat(Quat::from_rotation_y(TAU / -6.0))
+                }
                 _ => {}
             }
         }
 
         tr.translation += dtranslation.normalize_or_zero() * v.0 * time.delta_seconds();
-        rot.0 = rot.0.mul_quat(drot);
+        if rotated && !rot_cd.cooling {
+            rot_cd.t.reset();
+            rot_cd.cooling = true;
+            rot.0 = rot.0.mul_quat(drot);
+        }
     }
 }
 
@@ -94,6 +115,10 @@ impl Plugin for CameraControlPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
             .add_system(rig_input_system.system())
-            .add_system(rig_rotation_system.system());
+            .add_system(rig_rotation_system.system())
+            .insert_resource(RotationCooldown {
+                t: Timer::from_seconds(0.2, false),
+                cooling: false,
+            });
     }
 }
