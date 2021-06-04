@@ -31,6 +31,16 @@ pub struct BotsPlugin;
 
 pub const STEP_TIME: f32 = 0.8;
 
+// apply bot specific transformation
+fn bot_hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
+    let res = hex_axial_to_pixel(q, r);
+
+    let dx = (fastrand::f32() - 0.5) * 0.2;
+    let dy = (fastrand::f32() - 0.5) * 0.2;
+
+    res + Vec2::new(dx, dy - 0.2)
+}
+
 fn spawn_bot(
     cmd: &mut Commands,
     pos: Vec2,
@@ -127,15 +137,15 @@ fn on_new_entities(
     mut cmd: Commands,
     mut walk_timer: ResMut<WalkTimer>,
     mut map: ResMut<EntityMap>,
-    bot_assets: Res<crate::bots::bot_assets::BotRenderingAssets>,
-    mut bot_materials: ResMut<Assets<crate::bots::bot_assets::BotMaterial>>,
+    bot_assets: Res<bot_assets::BotRenderingAssets>,
+    mut bot_materials: ResMut<Assets<bot_assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
     mut bot_q: Query<
         (
-            &mut crate::bots::LastPos,
-            &mut crate::bots::NextPos,
-            &mut crate::bots::LastRotation,
-            &mut crate::bots::NextRotation,
+            &mut LastPos,
+            &mut NextPos,
+            &mut LastRotation,
+            &mut NextRotation,
         ),
         With<Bot>,
     >,
@@ -156,7 +166,7 @@ fn on_new_entities(
                 let pos = &bot.pos;
                 let new_id = spawn_bot(
                     &mut cmd,
-                    hex_axial_to_pixel(pos.q as f32, pos.r as f32),
+                    bot_hex_axial_to_pixel(pos.q as f32, pos.r as f32),
                     &*bot_assets,
                     &mut *bot_materials,
                 );
@@ -177,10 +187,10 @@ fn update_from_to(
     bot: &crate::caosim::cao_sim_model::Bot,
     bot_q: &mut Query<
         (
-            &mut crate::bots::LastPos,
-            &mut crate::bots::NextPos,
-            &mut crate::bots::LastRotation,
-            &mut crate::bots::NextRotation,
+            &mut LastPos,
+            &mut NextPos,
+            &mut LastRotation,
+            &mut NextRotation,
         ),
         With<Bot>,
     >,
@@ -189,7 +199,7 @@ fn update_from_to(
         bot_q.get_mut(bot_id).expect("Failed to get bot components");
 
     last_pos.0 = next_pos.0;
-    next_pos.0 = hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+    next_pos.0 = bot_hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
 
     last_rot.0 = next_rot.0;
     if next_pos.0 != last_pos.0 {
