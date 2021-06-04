@@ -72,30 +72,16 @@ fn _build_hex_prism_bases(
         indices.push(vertex0ind + 2);
         indices.push(vertex0ind + 0);
     }
-    if ys.len() != 1 {
-        for y in ys {
-            normals.extend(
-                [
-                    Vec3::new(0., *y, 1.).normalize(),
-                    Vec3::new(-0.5, *y, -1.).normalize(),
-                    Vec3::new(-0.5, *y, 1.).normalize(),
-                    Vec3::new(0., *y, -1.).normalize(),
-                    Vec3::new(0.5, *y, 1.).normalize(),
-                    Vec3::new(0.5, *y, -1.).normalize(),
-                ]
-                .iter()
-                .map(|v| [v.x, v.y, v.z]),
-            );
-        }
-    } else {
+
+    for y in ys {
         normals.extend(
             [
-                Vec3::new(0., 0., 1.).normalize(),
-                Vec3::new(0., 0., -1.).normalize(),
-                Vec3::new(0., 0., 1.).normalize(),
-                Vec3::new(0., 0., 1.).normalize(),
-                Vec3::new(0., 0., 1.).normalize(),
-                Vec3::new(0., 0., -1.).normalize(),
+                Vec3::new(0., *y, 1.).normalize(),
+                Vec3::new(-0.5, *y, -1.).normalize(),
+                Vec3::new(-0.5, *y, 1.).normalize(),
+                Vec3::new(0., *y, -1.).normalize(),
+                Vec3::new(0.5, *y, 1.).normalize(),
+                Vec3::new(0.5, *y, -1.).normalize(),
             ]
             .iter()
             .map(|v| [v.x, v.y, v.z]),
