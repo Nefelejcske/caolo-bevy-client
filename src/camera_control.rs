@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use bevy::prelude::*;
+use bevy::{input::mouse::MouseWheel, prelude::*};
 
 use crate::caosim;
 
@@ -21,6 +21,23 @@ struct RotationCooldown {
 fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
     for (mut tr, rot) in cam_rigs.iter_mut() {
         tr.rotation = tr.rotation.slerp(rot.0, 0.5);
+    }
+}
+
+fn inner_camera_input_system(
+    time: Res<Time>,
+    mut mouse_input: EventReader<MouseWheel>,
+    mut cams: Query<(&mut Transform, &Velocity), With<RoomCameraTag>>,
+) {
+    for event in mouse_input.iter() {
+        for (mut tr, vel) in cams.iter_mut() {
+            let forward = tr.local_z();
+            let pos = tr.translation + (forward * -event.y * vel.0 * time.delta_seconds());
+            // zoom bounds
+            if 5.0 <= pos.y && pos.y <= 100. {
+                tr.translation = pos;
+            }
+        }
     }
 }
 
@@ -107,6 +124,7 @@ fn setup(mut cmd: Commands) {
             c.spawn()
                 .insert_bundle(PerspectiveCameraBundle::new_3d())
                 .insert(innertr)
+                .insert(Velocity(150.0))
                 .insert(RoomCameraTag);
         });
 }
@@ -116,6 +134,7 @@ impl Plugin for CameraControlPlugin {
         app.add_startup_system(setup.system())
             .add_system(rig_input_system.system())
             .add_system(rig_rotation_system.system())
+            .add_system(inner_camera_input_system.system())
             .insert_resource(RotationCooldown {
                 t: Timer::from_seconds(0.2, false),
                 cooling: false,
