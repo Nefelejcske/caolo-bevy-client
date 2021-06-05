@@ -96,9 +96,27 @@ pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
     Vec3::new(p.x, 0.0, p.y)
 }
 
-fn update_transform(mut query: Query<(&CurrentPos, &CurrentRotation, &mut Transform)>) {
-    for (CurrentPos(p), CurrentRotation(q), mut tr) in query.iter_mut() {
+fn update_transform_pos(mut query: Query<(&CurrentPos, &mut Transform)>) {
+    for (CurrentPos(p), mut tr) in query.iter_mut() {
         tr.translation = pos_2d_to_3d(*p);
+    }
+}
+
+fn update_transform_rot(
+    mut children: Local<Vec<(Entity, Quat)>>,
+    mut queries: QuerySet<(Query<(&CurrentRotation, &Children)>, Query<&mut Transform>)>,
+) {
+    children.clear();
+    for (q, chldrn) in queries.q0().iter() {
+        for child in chldrn.iter() {
+            children.push((*child, q.0));
+        }
+    }
+    for (child, q) in children.iter() {
+        let mut tr = queries
+            .q1_mut()
+            .get_mut(*child)
+            .expect("Failed to query child transform");
         tr.rotation = *q;
     }
 }
@@ -266,7 +284,8 @@ impl Plugin for BotsPlugin {
         app.add_system(update_pos.system())
             .add_startup_system(setup.system())
             .add_system(on_new_entities.system())
-            .add_system(update_transform.system())
+            .add_system(update_transform_pos.system())
+            .add_system(update_transform_rot.system())
             .add_system(update_bot_materials.system())
             .add_system(update_orient.system())
             .init_resource::<bot_assets::BotRenderingAssets>()
