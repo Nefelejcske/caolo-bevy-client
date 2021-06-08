@@ -71,7 +71,6 @@ fn spawn_bot(
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 assets.pipeline.clone_weak(),
             )]),
-            transform: Transform::default(),
             ..Default::default()
         })
         .insert(material);
@@ -121,6 +120,7 @@ fn update_transform_rot(
     }
 }
 
+#[inline]
 fn smoothstep(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
@@ -129,7 +129,7 @@ fn smoothstep(t: f32) -> f32 {
 fn update_pos(
     mut t: ResMut<WalkTimer>,
     time: Res<Time>,
-    mut query: Query<(&LastPos, &NextPos, &mut CurrentPos), With<Bot>>,
+    mut query: Query<(&LastPos, &NextPos, &mut CurrentPos)>,
 ) {
     t.0.tick(time.delta());
     let WalkTimer(ref mut t) = &mut *t;
