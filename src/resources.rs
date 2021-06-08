@@ -69,6 +69,7 @@ fn on_new_entities(
     assets: Res<resource_assets::ResourceRenderingAssets>,
     mut materials: ResMut<Assets<resource_assets::ResourceMaterial>>,
     mut new_entities: EventReader<NewEntities>,
+    mut res_q: Query<&mut Transform, With<Resource>>,
 ) {
     for new_entities in new_entities.iter() {
         let len = entity_map.0.len();
@@ -78,8 +79,15 @@ fn on_new_entities(
         for res in new_entities.0.resources.iter() {
             let cao_id = SimEntityId(res.id);
             if let Some(res_id) = prev.remove(&cao_id) {
-                curr.insert(cao_id, res_id);
                 trace!("found entity {:?}", res.id);
+                curr.insert(cao_id, res_id);
+                let mut tr = res_q
+                    .get_mut(res_id)
+                    .expect("Failed to query existing resource transform");
+                // when resources respawn they usually aren't destroyed, just re-transformed
+                let pos = &res.pos;
+                let pos = hex_axial_to_pixel(pos.q as f32, pos.r as f32);
+                tr.translation = pos_2d_to_3d(pos);
             } else {
                 let pos = &res.pos;
                 let new_id = spawn_resource(
