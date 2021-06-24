@@ -1,3 +1,5 @@
+use std::convert::{TryFrom, TryInto};
+
 use super::cao_sim_model::AxialPos;
 use super::cao_sim_model::TerrainTy;
 
@@ -12,17 +14,21 @@ pub fn terrain_payload_to_components(
         input
             .iter()
             .copied()
-            .map(|i| i64_to_terrain(i).expect("Unhandled terrain type")),
+            .map(|i| i.try_into().expect("Unhandled terrain type")),
     )
 }
 
-pub fn i64_to_terrain(val: i64) -> Result<TerrainTy, i64> {
-    match val {
-        0 => Ok(TerrainTy::Empty),
-        1 => Ok(TerrainTy::Plain),
-        2 => Ok(TerrainTy::Wall),
-        3 => Ok(TerrainTy::Bridge),
-        _ => Err(val),
+impl TryFrom<i64> for TerrainTy {
+    type Error = i64;
+
+    fn try_from(val: i64) -> Result<Self, Self::Error> {
+        match val {
+            0 => Ok(TerrainTy::Empty),
+            1 => Ok(TerrainTy::Plain),
+            2 => Ok(TerrainTy::Wall),
+            3 => Ok(TerrainTy::Bridge),
+            _ => Err(val),
+        }
     }
 }
 
