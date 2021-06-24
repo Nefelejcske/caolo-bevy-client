@@ -191,8 +191,6 @@ fn setup(
     mut render_graph: ResMut<render_graph::RenderGraph>,
     mut terrain_rendering_assets: ResMut<terrain_assets::TerrainRenderingAssets>,
 ) {
-    asset_server.watch_for_changes().unwrap();
-
     let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(
         bevy::render::shader::ShaderStages {
             vertex: asset_server.load::<Shader, _>("shaders/terrain.vert"),

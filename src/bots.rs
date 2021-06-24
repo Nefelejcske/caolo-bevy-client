@@ -10,7 +10,10 @@ use bevy::{
     },
 };
 
-use crate::caosim::{hex_axial_to_pixel, NewEntities, SimEntityId};
+use crate::{
+    caosim::{hex_axial_to_pixel, NewEntities, SimEntityId},
+    mining::MiningEvent,
+};
 
 pub struct Bot;
 pub struct LastPos(pub Vec2);
@@ -158,6 +161,7 @@ fn on_new_entities(
     bot_assets: Res<bot_assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<bot_assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
+    mut mining_event: EventWriter<MiningEvent>,
     mut bot_q: Query<
         (
             &mut LastPos,
@@ -176,10 +180,12 @@ fn on_new_entities(
         curr.clear();
         for bot in new_entities.0.bots.iter() {
             let cao_id = SimEntityId(bot.id);
-            if let Some(bot_id) = prev.remove(&cao_id) {
-                curr.insert(cao_id, bot_id);
+            let bot_id;
+            if let Some(bid) = prev.remove(&cao_id) {
+                curr.insert(cao_id, bid);
                 trace!("found entity {:?}", bot.id);
-                update_from_to(bot_id, bot, &mut bot_q);
+                update_from_to(bid, bot, &mut bot_q);
+                bot_id = bid;
             } else {
                 let pos = &bot.pos;
                 let new_id = spawn_bot(
@@ -188,9 +194,16 @@ fn on_new_entities(
                     &*bot_assets,
                     &mut *bot_materials,
                 );
+                bot_id = new_id;
 
                 curr.insert(cao_id, new_id);
                 trace!("new entity {:?}", bot.id);
+            }
+            if let Some(mine) = &bot.mine_intent {
+                mining_event.send(MiningEvent {
+                    bot_id,
+                    resource_id: SimEntityId(mine.target_id),
+                });
             }
         }
         // these entities were not sent in the current tick
@@ -228,50 +241,25 @@ fn update_from_to(
 }
 
 fn setup(
-    mut t: ResMut<WalkTimer>,
-    asset_server: Res<AssetServer>,
-    pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
-    meshes: ResMut<Assets<Mesh>>,
-    render_graph: ResMut<render_graph::RenderGraph>,
-    bot_rendering_assets: ResMut<bot_assets::BotRenderingAssets>,
-) {
-    t.0 = Timer::from_seconds(STEP_TIME, false);
-    _setup_bot_rendering(
-        asset_server,
-        pipelines,
-        meshes,
-        render_graph,
-        bot_rendering_assets,
-    );
-}
-
-fn _setup_bot_rendering(
     asset_server: Res<AssetServer>,
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut render_graph: ResMut<render_graph::RenderGraph>,
     mut bot_rendering_assets: ResMut<bot_assets::BotRenderingAssets>,
 ) {
-    asset_server.watch_for_changes().unwrap();
-
     let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(
         bevy::render::shader::ShaderStages {
             vertex: asset_server.load::<Shader, _>("shaders/bot.vert"),
             fragment: Some(asset_server.load::<Shader, _>("shaders/bot.frag")),
         },
     ));
-
-    // Add an AssetRenderResourcesNode to our Render Graph. This will bind BotMaterial resources to our shader
     render_graph.add_system_node(
         "bot_material",
         render_graph::AssetRenderResourcesNode::<bot_assets::BotMaterial>::new(true),
     );
-
-    // Add a Render Graph edge connecting our new "bot_material" node to the main pass node. This ensures "bot_material" runs before the main pass
     render_graph
         .add_node_edge("bot_material", render_graph::base::node::MAIN_PASS)
         .unwrap();
-
     let mesh = meshes.add(Mesh::from(shape::Cube { size: 0.87 }));
     *bot_rendering_assets = bot_assets::BotRenderingAssets {
         pipeline: pipeline_handle,
@@ -291,6 +279,6 @@ impl Plugin for BotsPlugin {
             .init_resource::<bot_assets::BotRenderingAssets>()
             .init_resource::<EntityMap>()
             .add_asset::<bot_assets::BotMaterial>()
-            .init_resource::<WalkTimer>();
+            .insert_resource(WalkTimer(Timer::from_seconds(STEP_TIME, false)));
     }
 }

@@ -16,9 +16,9 @@ use crate::{
 };
 
 #[derive(Default)]
-struct EntityMap(pub HashMap<SimEntityId, Entity>);
+pub struct ResourceIdMap(pub HashMap<SimEntityId, Entity>);
 
-struct Resource;
+pub struct Resource;
 
 pub struct ResourcesPlugin;
 
@@ -65,7 +65,7 @@ fn update_res_materials(
 
 fn on_new_entities(
     mut cmd: Commands,
-    mut entity_map: ResMut<EntityMap>,
+    mut entity_map: ResMut<ResourceIdMap>,
     assets: Res<resource_assets::ResourceRenderingAssets>,
     mut materials: ResMut<Assets<resource_assets::ResourceMaterial>>,
     mut new_entities: EventReader<NewEntities>,
@@ -116,8 +116,6 @@ fn setup(
     mut render_graph: ResMut<render_graph::RenderGraph>,
     mut resource_rendering_assets: ResMut<resource_assets::ResourceRenderingAssets>,
 ) {
-    asset_server.watch_for_changes().unwrap();
-
     let pipeline_handle = pipelines.add(PipelineDescriptor::default_config(
         bevy::render::shader::ShaderStages {
             vertex: asset_server.load::<Shader, _>("shaders/resource.vert"),
@@ -153,6 +151,6 @@ impl Plugin for ResourcesPlugin {
             .add_system(update_res_materials.system())
             .init_resource::<resource_assets::ResourceRenderingAssets>()
             .add_asset::<resource_assets::ResourceMaterial>()
-            .init_resource::<EntityMap>();
+            .init_resource::<ResourceIdMap>();
     }
 }

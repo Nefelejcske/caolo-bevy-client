@@ -60,6 +60,20 @@ pub struct Bot {
     pub decay: Option<Decay>,
     pub logs: Option<String>,
     pub say: Option<String>,
+    pub mine_intent: Option<MineIntent>,
+    pub dropoff_intent: Option<DropoffIntent>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DropoffIntent {
+    pub target_id: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MineIntent {
+    pub target_id: i64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
