@@ -20,7 +20,7 @@ struct RotationCooldown {
 
 fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
     for (mut tr, rot) in cam_rigs.iter_mut() {
-        tr.rotation = tr.rotation.slerp(rot.0, 0.5);
+        tr.rotation = tr.rotation.slerp(rot.0, 0.3);
     }
 }
 
@@ -136,7 +136,7 @@ impl Plugin for CameraControlPlugin {
             .add_system(rig_rotation_system.system())
             .add_system(inner_camera_input_system.system())
             .insert_resource(RotationCooldown {
-                t: Timer::from_seconds(0.2, false),
+                t: Timer::from_seconds(0.35, false),
                 cooling: false,
             });
     }
