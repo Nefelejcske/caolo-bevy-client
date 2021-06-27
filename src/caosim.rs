@@ -210,7 +210,7 @@ fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
                         let msg = serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
                             .expect("Failed to deserialize msg");
                         match msg {
-                            cao_sim_model::Message::Terrain(terrain) => {
+                            cao_sim_model::Message::Terrain(Some(terrain)) => {
                                 info!("Got terrain");
                                 let pl = terrain_model::terrain_payload_to_components(
                                     terrain.tiles.as_slice(),
@@ -223,6 +223,9 @@ fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
                                         terrain: Arc::new(pl),
                                     })
                                     .expect("Failed to send new terrain");
+                            }
+                            cao_sim_model::Message::Terrain(None) => {
+                                info!("Terrain request returned null");
                             }
                             cao_sim_model::Message::Entities(ent) => {
                                 debug!("New entities, time: {}", ent.time);

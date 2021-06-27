@@ -3,7 +3,7 @@
 #[serde(tag = "ty", content = "payload")]
 pub enum Message {
     Entities(EntitiesPayload),
-    Terrain(TerrainPayload),
+    Terrain(Option<TerrainPayload>),
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
