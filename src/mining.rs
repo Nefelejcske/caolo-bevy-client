@@ -83,7 +83,7 @@ fn spawn_icon(cmd: &mut Commands, assets: &assets::MiningLaserRenderingAssets, f
                 transform,
                 ..Default::default()
             })
-            .insert_bundle((Timer::from_seconds(0.2, true), Icon));
+            .insert_bundle((Timer::from_seconds(0.1, true), Icon));
     });
 }
 
@@ -107,7 +107,7 @@ fn setup(
     mut rendering_assets: ResMut<assets::MiningLaserRenderingAssets>,
 ) {
     let texture_handle = asset_server.load("sprites/mining.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 2, 1);
+    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 4, 1);
     let texture_atlas_handle: Handle<TextureAtlas> = texture_atlases.add(texture_atlas);
     *rendering_assets = assets::MiningLaserRenderingAssets {
         atlas: texture_atlas_handle,
