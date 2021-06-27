@@ -4,6 +4,7 @@ mod caosim;
 mod main_menu;
 mod mining;
 mod resources;
+mod room_ui;
 mod terrain;
 
 use bevy::prelude::*;
@@ -34,6 +35,7 @@ fn main() {
         .add_plugin(mining::MiningPlugin)
         .add_plugin(main_menu::MainMenuPlugin)
         .add_plugin(bevy_egui::EguiPlugin)
+        .add_plugin(room_ui::RoomUiPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup.system())

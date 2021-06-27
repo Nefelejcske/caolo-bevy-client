@@ -59,7 +59,7 @@ type Ws = async_tungstenite::WebSocketStream<async_tungstenite::tokio::ConnectSt
 
 struct NewEntitiesRcv(crossbeam::channel::Receiver<NewEntities>);
 struct NewTerrainRcv(crossbeam::channel::Receiver<NewTerrain>);
-struct MessageSender(crossbeam::channel::Sender<Vec<u8>>);
+struct MessageSender(crossbeam::channel::Sender<tungstenite::Message>);
 
 #[derive(Clone)]
 pub struct CaoClient {
@@ -69,8 +69,8 @@ pub struct CaoClient {
         crossbeam::channel::Receiver<NewEntities>,
     ),
     send_message: (
-        crossbeam::channel::Sender<Vec<u8>>,
-        crossbeam::channel::Receiver<Vec<u8>>,
+        crossbeam::channel::Sender<tungstenite::Message>,
+        crossbeam::channel::Receiver<tungstenite::Message>,
     ),
     on_new_terrain: (
         crossbeam::channel::Sender<NewTerrain>,
@@ -96,7 +96,7 @@ impl CaoClient {
         }
     }
 
-    fn send_message(&self, pl: Vec<u8>) {
+    fn send_message(&self, pl: tungstenite::Message) {
         self.send_message.0.send(pl).expect("Failed to send");
     }
 
@@ -106,7 +106,7 @@ impl CaoClient {
             "room_id": room
         }))
         .unwrap();
-        self.send_message(payload);
+        self.send_message(tungstenite::Message::Binary(payload));
     }
 }
 
@@ -150,7 +150,7 @@ async fn get_connection() -> Result<Ws, tungstenite::error::Error> {
         })
 }
 
-async fn msg_sender<S>(msg_recv: crossbeam::channel::Receiver<Vec<u8>>, mut tx: S)
+async fn msg_sender<S>(msg_recv: crossbeam::channel::Receiver<tungstenite::Message>, mut tx: S)
 where
     S: Sink<tungstenite::Message> + std::marker::Unpin,
     <S as Sink<tungstenite::Message>>::Error: std::fmt::Debug,
@@ -158,7 +158,7 @@ where
     loop {
         match msg_recv.recv() {
             Ok(msg) => {
-                if let Err(err) = tx.send(tungstenite::Message::Binary(msg)).await {
+                if let Err(err) = tx.send(msg).await {
                     warn!("Send failed {:?}", err);
                 }
             }
@@ -171,6 +171,7 @@ where
 }
 
 fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
+    let msg_send = client.send_message.0.clone();
     let msg_recv = client.send_message.1.clone();
     let entities_sender = client.on_new_entities.0.clone();
     let terrain_sender = client.on_new_terrain.0.clone();
@@ -244,7 +245,9 @@ fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
                         trace!("Server pong received")
                     }
                     Ok(tungstenite::Message::Ping(_)) => {
-                        todo!();
+                        msg_send
+                            .send(tungstenite::Message::Pong(vec![]))
+                            .unwrap_or_default();
                     }
                     Ok(msg) => {
                         debug!("Unexpected message variant {:?}", msg);
