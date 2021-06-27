@@ -150,6 +150,26 @@ async fn get_connection() -> Result<Ws, tungstenite::error::Error> {
         })
 }
 
+async fn msg_sender<S>(msg_recv: crossbeam::channel::Receiver<Vec<u8>>, mut tx: S)
+where
+    S: Sink<tungstenite::Message> + std::marker::Unpin,
+    <S as Sink<tungstenite::Message>>::Error: std::fmt::Debug,
+{
+    loop {
+        match msg_recv.recv() {
+            Ok(msg) => {
+                if let Err(err) = tx.send(tungstenite::Message::Binary(msg)).await {
+                    warn!("Send failed {:?}", err);
+                }
+            }
+            Err(err) => {
+                debug!("Failed to recv from msg_recv {:?}", err);
+                break;
+            }
+        }
+    }
+}
+
 fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
     let msg_recv = client.send_message.1.clone();
     let entities_sender = client.on_new_entities.0.clone();
@@ -182,24 +202,9 @@ fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
                     continue;
                 }
             }
-            let (mut tx, mut rx) = ws_stream.split();
+            let (tx, mut rx) = ws_stream.split();
 
-            let msg_recv = msg_recv.clone();
-            runtime.spawn(async move {
-                loop {
-                    match msg_recv.recv() {
-                        Ok(msg) => {
-                            if let Err(err) = tx.send(tungstenite::Message::Binary(msg)).await {
-                                warn!("Send failed {:?}", err);
-                            }
-                        }
-                        Err(err) => {
-                            debug!("Failed to recv from msg_recv {:?}", err);
-                            break;
-                        }
-                    }
-                }
-            });
+            runtime.spawn(msg_sender(msg_recv.clone(), tx));
 
             let entities_sender = entities_sender.clone();
             let terrain_sender = terrain_sender.clone();
