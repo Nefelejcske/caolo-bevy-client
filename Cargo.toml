@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 bevy = "0.5"
+bevy_egui = "0.5"
 cao-lang = { git = "https://github.com/caolo-game/cao-lang.git" }
 surf = { version = "2" }
 serde = { version = "1", features = ["derive"] }
@@ -14,7 +15,7 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = "0.2"
 crossbeam = "*"
-tokio = { version = "1", features = ["sync", "rt-multi-thread"] }
+tokio = { version = "1", features = ["sync", "rt-multi-thread", "time"] }
 async-tungstenite = { version = "0.13", features = [
     "tokio-runtime",
     "tokio-native-tls"
@@ -22,6 +23,7 @@ async-tungstenite = { version = "0.13", features = [
 tungstenite = { version = "0.13" }
 futures = "0.3"
 fastrand = "1.4"
+atomic_enum = "0.1"
 
 # Enable optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]

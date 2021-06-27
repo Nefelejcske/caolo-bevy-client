@@ -107,6 +107,11 @@ fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
     }
 }
 
+fn on_enter_system(client: Res<crate::caosim::CaoClient>) {
+    debug!("Sending initial room");
+    client.send_current_room(crate::caosim::cao_sim_model::AxialPos { q: 15, r: 15 });
+}
+
 fn on_new_terrain(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
@@ -217,7 +222,12 @@ fn setup(
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
-            .add_system(on_new_terrain.system())
+            .add_system_set(
+                SystemSet::on_enter(crate::AppState::Room).with_system(on_enter_system.system()),
+            )
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::Room).with_system(on_new_terrain.system()),
+            )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
             .add_asset::<terrain_assets::TerrainMaterial>();
     }

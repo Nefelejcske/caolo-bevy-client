@@ -13,6 +13,7 @@ use bevy::{
 use crate::{
     caosim::{hex_axial_to_pixel, NewEntities, SimEntityId},
     mining::MiningEvent,
+    AppState,
 };
 
 pub struct Bot;
@@ -269,13 +270,16 @@ fn setup(
 
 impl Plugin for BotsPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_system(update_pos.system())
-            .add_startup_system(setup.system())
-            .add_system(on_new_entities.system())
-            .add_system(update_transform_pos.system())
-            .add_system(update_transform_rot.system())
-            .add_system(update_bot_materials.system())
-            .add_system(update_orient.system())
+        app.add_startup_system(setup.system())
+            .add_system_set(
+                SystemSet::on_update(AppState::Room)
+                    .with_system(update_pos.system())
+                    .with_system(on_new_entities.system())
+                    .with_system(update_transform_pos.system())
+                    .with_system(update_transform_rot.system())
+                    .with_system(update_bot_materials.system())
+                    .with_system(update_orient.system()),
+            )
             .init_resource::<bot_assets::BotRenderingAssets>()
             .init_resource::<EntityMap>()
             .add_asset::<bot_assets::BotMaterial>()

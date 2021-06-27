@@ -7,7 +7,10 @@ pub mod terrain_model;
 use bevy::prelude::*;
 use futures::prelude::*;
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use self::cao_sim_model::{AxialPos, RoomId, TerrainTy};
 
@@ -16,6 +19,40 @@ pub struct NewEntities(pub Arc<cao_sim_model::EntitiesPayload>);
 pub struct NewTerrain {
     pub room_id: RoomId,
     pub terrain: Arc<Vec<(AxialPos, TerrainTy)>>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(usize)]
+pub enum ConnectionState {
+    Connecting = 0,
+    Connected = 1,
+    Closed = 2,
+    Error = 3,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConnectionStateRes(Arc<AtomicUsize>);
+
+impl ConnectionStateRes {
+    fn new(state: ConnectionState) -> Self {
+        Self(Arc::new(AtomicUsize::new(state as usize)))
+    }
+
+    fn store(&self, state: ConnectionState, ord: Ordering) {
+        self.0.store(state as usize, ord);
+    }
+
+    pub fn load(&self, ord: Ordering) -> ConnectionState {
+        let value: usize = self.0.load(ord);
+
+        match value {
+            0 => ConnectionState::Connecting,
+            1 => ConnectionState::Connected,
+            2 => ConnectionState::Closed,
+            3 => ConnectionState::Error,
+            _ => unreachable!(),
+        }
+    }
 }
 
 type Ws = async_tungstenite::WebSocketStream<async_tungstenite::tokio::ConnectStream>;
@@ -27,15 +64,15 @@ struct MessageSender(crossbeam::channel::Sender<Vec<u8>>);
 #[derive(Clone)]
 pub struct CaoClient {
     pub runtime: Arc<tokio::runtime::Runtime>,
-    pub on_new_entities: (
+    on_new_entities: (
         crossbeam::channel::Sender<NewEntities>,
         crossbeam::channel::Receiver<NewEntities>,
     ),
-    pub send_message: (
+    send_message: (
         crossbeam::channel::Sender<Vec<u8>>,
         crossbeam::channel::Receiver<Vec<u8>>,
     ),
-    pub on_new_terrain: (
+    on_new_terrain: (
         crossbeam::channel::Sender<NewTerrain>,
         crossbeam::channel::Receiver<NewTerrain>,
     ),
@@ -58,6 +95,19 @@ impl CaoClient {
             on_new_terrain,
         }
     }
+
+    fn send_message(&self, pl: Vec<u8>) {
+        self.send_message.0.send(pl).expect("Failed to send");
+    }
+
+    pub fn send_current_room(&self, room: AxialPos) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "room_id",
+            "room_id": room
+        }))
+        .unwrap();
+        self.send_message(payload);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -71,57 +121,92 @@ pub fn hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
     Vec2::new(q * SQRT3 + r * SQRT3_2, r * THREE_OVER_TWO)
 }
 
-fn send_new_terrain(recv: Res<NewTerrainRcv>, mut on_new_terrain: EventWriter<NewTerrain>) {
+fn send_new_terrain_system(recv: Res<NewTerrainRcv>, mut on_new_terrain: EventWriter<NewTerrain>) {
     while let Ok(terrain) = recv.0.recv_timeout(std::time::Duration::from_micros(1)) {
         on_new_terrain.send(terrain);
     }
 }
 
 /// Fire NewEntities event and reset current_entities
-fn send_new_entities(recv: Res<NewEntitiesRcv>, mut on_new_entities: EventWriter<NewEntities>) {
+fn send_new_entities_system(
+    recv: Res<NewEntitiesRcv>,
+    mut on_new_entities: EventWriter<NewEntities>,
+) {
     while let Ok(entities) = recv.0.recv_timeout(std::time::Duration::from_micros(1)) {
         on_new_entities.send(entities);
     }
 }
 
-async fn get_connection() -> Ws {
-    let (ws_stream, _resp) =
-        async_tungstenite::tokio::connect_async("wss://rt-snorrwe.cloud.okteto.net/object-stream")
-            .await
-            .expect("Failed to connect to object-stream"); // TODO: handle errors and re-try
-    debug!("Successfully connected to object-stream");
-    ws_stream
-}
-
-// TODO: error pls
-async fn send_current_room(stream: &mut Ws, room: AxialPos) {
-    let initial_pl = serde_json::to_vec(&serde_json::json!({
-        "ty": "room_id",
-        "room_id": room
-    }))
-    .unwrap();
-    stream
-        .send(tungstenite::Message::Binary(initial_pl))
+async fn get_connection() -> Result<Ws, tungstenite::error::Error> {
+    async_tungstenite::tokio::connect_async("wss://rt-snorrwe.cloud.okteto.net/object-stream")
         .await
-        .unwrap();
+        .map(|(stream, _resp)| {
+            debug!("Successfully connected to object-stream");
+            stream
+        })
+        .map_err(|err| {
+            error!("Failed to connect to object-stream {:?}", err);
+            err
+        })
 }
 
-fn setup(client: ResMut<CaoClient>) {
-    let _msg_recv = client.send_message.1.clone();
+fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
+    let msg_recv = client.send_message.1.clone();
     let entities_sender = client.on_new_entities.0.clone();
     let terrain_sender = client.on_new_terrain.0.clone();
 
+    let state: ConnectionStateRes = state.clone();
+    let runtime = client.runtime.clone();
     client.runtime.spawn(async move {
+        let mut backoff = 1;
         loop {
-            info!("Connecting to game-object steam");
+            info!("Connecting to caosim stream");
 
-            let mut ws_stream = get_connection().await;
-            // TODO: current room
-            send_current_room(&mut ws_stream, AxialPos { q: 15, r: 15 }).await;
+            state.store(ConnectionState::Connecting, Ordering::Release);
 
-            while let Some(msg) = ws_stream.next().await {
+            let ws_stream;
+            match get_connection().await {
+                Ok(s) => {
+                    info!("Successfully connected to caosim stream");
+                    state.store(ConnectionState::Connected, Ordering::Release);
+                    backoff = 1;
+                    ws_stream = s;
+                }
+                Err(_) => {
+                    debug!("Retrying");
+                    state.store(ConnectionState::Error, Ordering::Release);
+
+                    tokio::time::sleep(std::time::Duration::from_millis(backoff)).await;
+                    backoff = (backoff << 1).max(4096);
+
+                    continue;
+                }
+            }
+            let (mut tx, mut rx) = ws_stream.split();
+
+            let msg_recv = msg_recv.clone();
+            runtime.spawn(async move {
+                loop {
+                    match msg_recv.recv() {
+                        Ok(msg) => {
+                            if let Err(err) = tx.send(tungstenite::Message::Binary(msg)).await {
+                                warn!("Send failed {:?}", err);
+                            }
+                        }
+                        Err(err) => {
+                            debug!("Failed to recv from msg_recv {:?}", err);
+                            break;
+                        }
+                    }
+                }
+            });
+
+            let entities_sender = entities_sender.clone();
+            let terrain_sender = terrain_sender.clone();
+            while let Some(msg) = rx.next().await {
                 match msg {
                     Ok(tungstenite::Message::Text(txt)) => {
+                        debug!("Incoming message");
                         let msg = serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
                             .expect("Failed to deserialize msg");
                         match msg {
@@ -151,11 +236,7 @@ fn setup(client: ResMut<CaoClient>) {
                         trace!("Server pong received")
                     }
                     Ok(tungstenite::Message::Ping(_)) => {
-                        if let Err(err) =
-                            ws_stream.send(tungstenite::Message::Pong(Vec::new())).await
-                        {
-                            error!("Failed to pong {}", err);
-                        }
+                        todo!();
                     }
                     Ok(msg) => {
                         debug!("Unexpected message variant {:?}", msg);
@@ -175,11 +256,12 @@ impl Plugin for CaoSimPlugin {
         app.add_startup_system(setup.system())
             .add_event::<NewEntities>()
             .add_event::<NewTerrain>()
-            .add_system(send_new_entities.system())
-            .add_system(send_new_terrain.system())
+            .add_system(send_new_entities_system.system())
+            .add_system(send_new_terrain_system.system())
             .insert_resource(NewEntitiesRcv(client.on_new_entities.1.clone()))
             .insert_resource(NewTerrainRcv(client.on_new_terrain.1.clone()))
             .insert_resource(MessageSender(client.send_message.0.clone()))
-            .insert_resource(client);
+            .insert_resource(client)
+            .insert_resource(ConnectionStateRes::new(ConnectionState::Connecting));
     }
 }

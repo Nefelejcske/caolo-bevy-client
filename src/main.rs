@@ -1,11 +1,18 @@
 mod bots;
 mod camera_control;
 mod caosim;
+mod main_menu;
 mod mining;
 mod resources;
 mod terrain;
 
 use bevy::prelude::*;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum AppState {
+    MainMenu,
+    Room,
+}
 
 fn setup(asset_server: Res<AssetServer>) {
     asset_server.watch_for_changes().unwrap();
@@ -25,9 +32,11 @@ fn main() {
         .add_plugin(camera_control::CameraControlPlugin)
         .add_plugin(resources::ResourcesPlugin)
         .add_plugin(mining::MiningPlugin)
+        .add_plugin(main_menu::MainMenuPlugin)
+        .add_plugin(bevy_egui::EguiPlugin)
+        .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup.system())
-        // .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
-        // .add_plugin(bevy::diagnostic::LogDiagnosticsPlugin::default())
+        .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .run();
 }

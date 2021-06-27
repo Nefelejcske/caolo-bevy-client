@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::{input::mouse::MouseWheel, prelude::*};
 
-use crate::caosim;
+use crate::{caosim, AppState};
 
 pub struct CameraControlPlugin;
 pub struct RoomCameraTag;
@@ -131,10 +131,13 @@ fn setup(mut cmd: Commands) {
 
 impl Plugin for CameraControlPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
-            .add_system(rig_input_system.system())
-            .add_system(rig_rotation_system.system())
-            .add_system(inner_camera_input_system.system())
+        app.add_system_set(SystemSet::on_enter(AppState::Room).with_system(setup.system()))
+            .add_system_set(
+                SystemSet::on_update(AppState::Room)
+                    .with_system(rig_input_system.system())
+                    .with_system(rig_rotation_system.system())
+                    .with_system(inner_camera_input_system.system()),
+            )
             .insert_resource(RotationCooldown {
                 t: Timer::from_seconds(0.35, false),
                 cooling: false,

@@ -147,10 +147,13 @@ fn setup(
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
-            .add_system(on_new_entities.system())
-            .add_system(update_res_materials.system())
-            .init_resource::<resource_assets::ResourceRenderingAssets>()
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::Room)
+                    .with_system(on_new_entities.system())
+                    .with_system(update_res_materials.system()),
+            )
             .add_asset::<resource_assets::ResourceMaterial>()
+            .init_resource::<resource_assets::ResourceRenderingAssets>()
             .init_resource::<ResourceIdMap>();
     }
 }

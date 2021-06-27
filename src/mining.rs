@@ -119,10 +119,13 @@ pub struct MiningPlugin;
 impl Plugin for MiningPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
-            .add_system(handle_mining.system())
-            .add_system(laser_animation_system.system())
-            .add_system(cleanup_system.system())
-            .add_system(move_icon_with_cam.system())
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::Room)
+                    .with_system(handle_mining.system())
+                    .with_system(laser_animation_system.system())
+                    .with_system(cleanup_system.system())
+                    .with_system(move_icon_with_cam.system()),
+            )
             .init_resource::<assets::MiningLaserRenderingAssets>()
             .add_event::<MiningEvent>();
     }
