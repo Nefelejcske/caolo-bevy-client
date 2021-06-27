@@ -39,7 +39,7 @@ pub struct EntitiesPayload {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct AxialPos {

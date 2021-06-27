@@ -1,4 +1,4 @@
-use crate::caosim::{NewEntities, NewTerrain};
+use crate::caosim::{ConnectionStateRes, NewEntities, NewTerrain};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
 
@@ -26,13 +26,19 @@ fn on_new_entities(mut data: ResMut<Diag>, mut new_entities: EventReader<NewEnti
     }
 }
 
-fn update_ui_system(data: Res<Diag>, egui_ctx: Res<EguiContext>) {
-    egui::Window::new("World").show(egui_ctx.ctx(), |ui| {
+fn update_ui_system(
+    data: Res<Diag>,
+    egui_ctx: Res<EguiContext>,
+    connection_state: Res<ConnectionStateRes>,
+) {
+    let connection_state = connection_state.load(std::sync::atomic::Ordering::Relaxed);
+    egui::Window::new("Room diagnostics").show(egui_ctx.ctx(), |ui| {
         ui.label(format!("Tick: {}", data.time));
         ui.label(format!("# of bots: {}", data.num_bots));
         ui.label(format!("# of resources: {}", data.num_resources));
         ui.label(format!("# of structures: {}", data.num_structures));
         ui.label(format!("# of hex tiles: {}", data.num_tiles));
+        ui.label(format!("Connection state: {:?}", connection_state));
     });
 }
 

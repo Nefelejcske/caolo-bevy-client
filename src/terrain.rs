@@ -8,10 +8,11 @@ use bevy::{
     },
 };
 
-use crate::bots::pos_2d_to_3d;
 use crate::caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain};
+use crate::{bots::pos_2d_to_3d, caosim::Connected};
 
 pub struct TerrainPlugin;
+pub struct CurrentRoom(pub crate::caosim::cao_sim_model::AxialPos);
 
 pub struct Room;
 
@@ -107,9 +108,20 @@ fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
     }
 }
 
-fn on_enter_system(client: Res<crate::caosim::CaoClient>) {
-    debug!("Sending initial room");
-    client.send_current_room(crate::caosim::cao_sim_model::AxialPos { q: 15, r: 15 });
+fn on_enter_system(current_room: Res<CurrentRoom>, client: Res<crate::caosim::CaoClient>) {
+    info!("Sending initial room");
+    client.send_current_room(current_room.0);
+}
+
+fn on_reconnect_system(
+    current_room: Res<CurrentRoom>,
+    client: Res<crate::caosim::CaoClient>,
+    mut on_reconnect: EventReader<Connected>,
+) {
+    for _ in on_reconnect.iter() {
+        info!("Reconnect event received, sending current room");
+        client.send_current_room(current_room.0);
+    }
 }
 
 fn on_new_terrain(
@@ -226,9 +238,15 @@ impl Plugin for TerrainPlugin {
                 SystemSet::on_enter(crate::AppState::Room).with_system(on_enter_system.system()),
             )
             .add_system_set(
-                SystemSet::on_update(crate::AppState::Room).with_system(on_new_terrain.system()),
+                SystemSet::on_update(crate::AppState::Room)
+                    .with_system(on_new_terrain.system())
+                    .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
+            .insert_resource(CurrentRoom(crate::caosim::cao_sim_model::AxialPos {
+                q: 15,
+                r: 15,
+            }))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }
 }

@@ -13,7 +13,7 @@ fn update_menu_system(
     connection_state: Res<ConnectionStateRes>,
 ) {
     let connection_state = connection_state.load(std::sync::atomic::Ordering::Relaxed);
-    let connected = matches!(connection_state, ConnectionState::Connected);
+    let connected = matches!(connection_state, ConnectionState::Online);
 
     egui::CentralPanel::default().show(egui_ctx.ctx(), |ui| {
         ui.heading("CaoLo");
@@ -23,7 +23,7 @@ fn update_menu_system(
 
             let pl = match connection_state {
                 ConnectionState::Connecting => "Connecting...",
-                ConnectionState::Connected => "Online",
+                ConnectionState::Online => "Online",
                 ConnectionState::Closed => "Closed",
                 ConnectionState::Error => "Error",
             };
