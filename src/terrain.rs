@@ -8,8 +8,11 @@ use bevy::{
     },
 };
 
-use crate::caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain};
 use crate::{bots::pos_2d_to_3d, caosim::Connected};
+use crate::{
+    caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
+    room_interaction::SelectedTile,
+};
 
 pub struct TerrainPlugin;
 pub struct CurrentRoom(pub crate::caosim::cao_sim_model::AxialPos);
@@ -124,7 +127,19 @@ fn on_reconnect_system(
     }
 }
 
-fn on_new_terrain(
+fn update_terrain_material_system(
+    selected_tile: Res<SelectedTile>,
+    mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
+    rooms: Query<&Handle<terrain_assets::TerrainMaterial>>,
+) {
+    for room_mat in rooms.iter() {
+        if let Some(mat) = materials.get_mut(room_mat) {
+            mat.cursor_pos = selected_tile.world_pos;
+        }
+    }
+}
+
+fn on_new_terrain_system(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
     assets: Res<terrain_assets::TerrainRenderingAssets>,
@@ -133,7 +148,7 @@ fn on_new_terrain(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     for new_terrain in new_terrain.iter() {
-        info!("Poggies {:?}", new_terrain.room_id);
+        info!("Got new terrain {:?}", new_terrain.room_id);
         let start = std::time::Instant::now();
 
         for e in existing_tiles.iter() {
@@ -184,7 +199,9 @@ fn on_new_terrain(
 
         let mesh = meshes.add(mesh);
 
-        let material = materials.add(terrain_assets::TerrainMaterial {});
+        let material = materials.add(terrain_assets::TerrainMaterial {
+            cursor_pos: Vec3::ZERO,
+        });
 
         cmd.spawn_bundle(MeshBundle {
             mesh,
@@ -239,7 +256,8 @@ impl Plugin for TerrainPlugin {
             )
             .add_system_set(
                 SystemSet::on_update(crate::AppState::Room)
-                    .with_system(on_new_terrain.system())
+                    .with_system(on_new_terrain_system.system())
+                    .with_system(update_terrain_material_system.system())
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()

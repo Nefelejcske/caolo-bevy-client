@@ -9,6 +9,7 @@ edition = "2018"
 bevy = "0.5"
 bevy_egui = "0.5"
 cao-lang = { git = "https://github.com/caolo-game/cao-lang.git" }
+cao-math = { git = "https://github.com/caolo-game/cao-math.git" }
 surf = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

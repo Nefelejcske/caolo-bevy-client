@@ -10,7 +10,7 @@ pub fn terrain_payload_to_components(
 
     assert_eq!(input.len(), positions.len());
 
-    positions.iter().cloned().zip(
+    positions.iter().copied().zip(
         input
             .iter()
             .copied()

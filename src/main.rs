@@ -4,6 +4,7 @@ mod caosim;
 mod main_menu;
 mod mining;
 mod resources;
+mod room_interaction;
 mod room_ui;
 mod terrain;
 
@@ -36,6 +37,7 @@ fn main() {
         .add_plugin(main_menu::MainMenuPlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(room_ui::RoomUiPlugin)
+        .add_plugin(room_interaction::RoomInteractionPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup.system())

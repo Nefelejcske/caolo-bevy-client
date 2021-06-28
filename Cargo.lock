@@ -1052,6 +1052,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "cao-math"
+version = "0.1.31"
+source = "git+https://github.com/caolo-game/cao-math.git#d0b056192104c4f212133cc6f65db14b730d0db2"
+dependencies = [
+ "console_error_panic_hook",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "caolo"
 version = "0.1.0"
 dependencies = [
@@ -1060,6 +1072,7 @@ dependencies = [
  "bevy",
  "bevy_egui",
  "cao-lang",
+ "cao-math",
  "crossbeam",
  "fastrand",
  "futures",
@@ -3366,7 +3379,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3c7a20e3f122223e68eef6ca58e39bc1ea8a1d83418ba4c2c1ba189d2ee355"
 dependencies = [
- "ttf-parser 0.12.2",
+ "ttf-parser 0.12.3",
 ]
 
 [[package]]
@@ -4481,9 +4494,9 @@ checksum = "3e5d7cd7ab3e47dda6e56542f4bbf3824c15234958c6e1bd6aaa347e93499fdc"
 
 [[package]]
 name = "ttf-parser"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c56097738aec26a3f347edf99f5c84d9d4e3a4b8ce5513ebca85cb621fc7c50"
+checksum = "7ae2f58a822f08abdaf668897e96a5656fe72f5a9ce66422423e8849384872e6"
 
 [[package]]
 name = "tungstenite"
@@ -4660,6 +4673,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cd364751395ca0f68cafb17666eee36b63077fb5ecd972bbcd74c90c4bf736e"
 dependencies = [
  "cfg-if 1.0.0",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 

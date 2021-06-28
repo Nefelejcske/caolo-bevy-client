@@ -83,7 +83,7 @@ fn spawn_icon(cmd: &mut Commands, assets: &assets::MiningLaserRenderingAssets, f
                 transform,
                 ..Default::default()
             })
-            .insert_bundle((Timer::from_seconds(0.1, true), Icon));
+            .insert_bundle((Timer::from_seconds(0.15, true), Icon));
     });
 }
 
