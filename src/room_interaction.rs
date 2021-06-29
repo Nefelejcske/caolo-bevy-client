@@ -12,29 +12,31 @@ pub struct SelectedTile {
 }
 
 fn window_to_world(
-    pos: Vec2,
+    window_pos: Vec2,
     window: &Window,
-    cam: &GlobalTransform,
-    proj: &PerspectiveProjection,
+    cam_transform: &GlobalTransform,
+    projection: &PerspectiveProjection,
 ) -> Vec3 {
     // normalized device coordinates
     let norm = Vec3::new(
-        (2.0 * pos.x) / window.width() - 1.,
-        (2.0 * pos.y) / window.height() - 1.,
-        proj.near,
+        (2.0 * window_pos.x) / window.width() - 1.,
+        (2.0 * window_pos.y) / window.height() - 1.,
+        projection.near,
     );
 
-    let ndc_to_world = cam.compute_matrix() * proj.get_projection_matrix().inverse();
+    let ndc_to_world =
+        cam_transform.compute_matrix() * projection.get_projection_matrix().inverse();
     ndc_to_world.project_point3(norm)
 }
 
-/// intersect a given AB line with the plane of the terrain
+/// intersect a given AB line with the plane of the terrain.
+/// Assumes that the line always intersects the plane...
+///
+/// - `n=<0, 1, 0>`
+/// - `d=-1`
 fn intersect_line_terrain_plain(a: Vec3, b: Vec3) -> Vec3 {
     let ab = b - a;
 
-    // intersect against plane
-    // n=<0, 1, 0>
-    // d=-1
     let n = Vec3::Y;
     let t = (-1.0 - n.dot(a)) / n.dot(ab);
 
