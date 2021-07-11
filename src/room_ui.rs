@@ -47,7 +47,7 @@ fn update_ui_system(
 
 fn selected_entity_window_system(
     egui_ctx: Res<EguiContext>,
-    selected_entity: Res<SelectedEntity>,
+    mut selected_entity: ResMut<SelectedEntity>,
     bots: Res<crate::bots::BotPayload>,
 ) {
     egui::Window::new("Selected Entity").show(egui_ctx.ctx(), |ui| {
@@ -60,19 +60,28 @@ fn selected_entity_window_system(
                     ui.label("Unrecognised entity!");
                 }
                 crate::EntityType::Bot => {
-                    // if the bot despawns in the current tick this _may_ return none
-                    if let Some(bot) = bots.0.get(&selected.0) {
-                        if let Some(hp) = &bot.hp {
-                            ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
-                        }
-                        if let Some(carry) = &bot.carry {
-                            ui.label(format!("Carry: {} / {}", carry.value, carry.value_max));
-                        }
-                        ui.label(format!("Position: {:?}", bot.pos));
+                    match bots.0.get(&selected.0) {
+                        Some(bot) => {
+                            ui.label(format!("Position: {:?}", bot.pos));
+                            if let Some(hp) = &bot.hp {
+                                ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
+                            }
+                            if let Some(carry) = &bot.carry {
+                                ui.label(format!("Carry: {} / {}", carry.value, carry.value_max));
+                            }
+                            if let Some(decay) = &bot.decay {
+                                ui.label(format!(
+                                    "Decay: amount: {}, interval: {}, time remaining: {}",
+                                    decay.hp_amount, decay.interval, decay.time_remaining
+                                ));
+                            }
 
-                        if let Some(say) = &bot.say {
-                            ui.label(format!("Bot says: {}", say));
+                            if let Some(say) = &bot.say {
+                                ui.label(format!("Bot says: {}", say));
+                            }
                         }
+                        // entity has died
+                        None => selected_entity.entity = None,
                     }
                 }
                 crate::EntityType::Resource => todo!(),
