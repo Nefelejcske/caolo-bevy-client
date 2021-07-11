@@ -27,7 +27,7 @@ impl Default for SelectedEntity {
 
 #[derive(Debug, Clone, Copy)]
 struct EntitySelection {
-    pub click_id: i32,
+    pub click_id: u32,
     pub axial: AxialPos,
 }
 

@@ -60,17 +60,19 @@ fn selected_entity_window_system(
                     ui.label("Unrecognised entity!");
                 }
                 crate::EntityType::Bot => {
-                    let bot = &bots.0[&selected.0];
-                    if let Some(hp) = &bot.hp {
-                        ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
-                    }
-                    if let Some(carry) = &bot.carry {
-                        ui.label(format!("Carry: {} / {}", carry.value, carry.value_max));
-                    }
-                    ui.label(format!("Position: {:?}", bot.pos));
+                    // if the bot despawns in the current tick this _may_ return none
+                    if let Some(bot) = bots.0.get(&selected.0) {
+                        if let Some(hp) = &bot.hp {
+                            ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
+                        }
+                        if let Some(carry) = &bot.carry {
+                            ui.label(format!("Carry: {} / {}", carry.value, carry.value_max));
+                        }
+                        ui.label(format!("Position: {:?}", bot.pos));
 
-                    if let Some(say) = &bot.say {
-                        ui.label(format!("Bot says: {}", say));
+                        if let Some(say) = &bot.say {
+                            ui.label(format!("Bot says: {}", say));
+                        }
                     }
                 }
                 crate::EntityType::Resource => todo!(),
