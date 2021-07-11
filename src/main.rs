@@ -16,6 +16,14 @@ pub enum AppState {
     Room,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum EntityType {
+    Undefined = 0,
+    Bot,
+    Resource,
+    Structure,
+}
+
 fn setup(asset_server: Res<AssetServer>) {
     asset_server.watch_for_changes().unwrap();
 }

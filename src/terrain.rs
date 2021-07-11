@@ -11,7 +11,7 @@ use bevy::{
 use crate::{bots::pos_2d_to_3d, caosim::Connected};
 use crate::{
     caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
-    room_interaction::SelectedTile,
+    room_interaction::HoveredTile,
 };
 
 pub struct TerrainPlugin;
@@ -128,7 +128,7 @@ fn on_reconnect_system(
 }
 
 fn update_terrain_material_system(
-    selected_tile: Res<SelectedTile>,
+    selected_tile: Res<HoveredTile>,
     mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
     rooms: Query<&Handle<terrain_assets::TerrainMaterial>>,
 ) {

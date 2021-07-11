@@ -1,4 +1,7 @@
-use crate::caosim::{ConnectionStateRes, NewEntities, NewTerrain};
+use crate::{
+    caosim::{ConnectionStateRes, NewEntities, NewTerrain},
+    room_interaction::SelectedEntity,
+};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
 
@@ -42,13 +45,54 @@ fn update_ui_system(
     });
 }
 
+fn selected_entity_window_system(
+    egui_ctx: Res<EguiContext>,
+    selected_entity: Res<SelectedEntity>,
+    bots: Res<crate::bots::BotPayload>,
+) {
+    egui::Window::new("Selected Entity").show(egui_ctx.ctx(), |ui| {
+        if let Some(selected) = selected_entity.entity {
+            ui.label(format!("EntityID: {}", selected.0 .0));
+
+            match selected_entity.ty {
+                crate::EntityType::Undefined => {
+                    error!("Undefined entity type for entity {:?}", selected.0 .0);
+                    ui.label("Unrecognised entity!");
+                }
+                crate::EntityType::Bot => {
+                    let bot = &bots.0[&selected.0];
+                    if let Some(hp) = &bot.hp {
+                        ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
+                    }
+                    if let Some(carry) = &bot.carry {
+                        ui.label(format!("Carry: {} / {}", carry.value, carry.value_max));
+                    }
+                    ui.label(format!("Position: {:?}", bot.pos));
+
+                    if let Some(say) = &bot.say {
+                        ui.label(format!("Bot says: {}", say));
+                    }
+                }
+                crate::EntityType::Resource => todo!(),
+                crate::EntityType::Structure => todo!(),
+            }
+        }
+    });
+}
+
 pub struct RoomUiPlugin;
 
 impl Plugin for RoomUiPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.insert_resource(Diag::default())
             .add_system_set(
-                SystemSet::on_update(crate::AppState::Room).with_system(update_ui_system.system()),
+                SystemSet::on_update(crate::AppState::Room)
+                    // ui systems have to be chained
+                    .with_system(
+                        update_ui_system
+                            .system()
+                            .chain(selected_entity_window_system.system()),
+                    ),
             )
             .add_system(on_new_entities.system())
             .add_system(on_new_terrain.system());

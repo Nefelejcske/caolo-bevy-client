@@ -11,7 +11,7 @@ use bevy::{
 };
 
 use crate::{
-    caosim::{hex_axial_to_pixel, NewEntities, SimEntityId},
+    caosim::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
     mining::MiningEvent,
     AppState,
 };
@@ -28,8 +28,9 @@ pub struct CurrentRotation(pub Quat);
 #[derive(Debug, Clone, Default)]
 struct WalkTimer(Timer);
 
-#[derive(Default)]
-struct EntityMap(pub HashMap<SimEntityId, Entity>);
+pub struct BotPayload(pub HashMap<SimEntityId, crate::caosim::cao_sim_model::Bot>);
+pub struct SimIdEntityIdMap(pub HashMap<SimEntityId, Entity>);
+pub struct EntityPositionMap(pub HashMap<AxialPos, (SimEntityId, Entity)>);
 
 pub struct BotsPlugin;
 
@@ -158,7 +159,9 @@ fn update_orient(
 fn on_new_entities(
     mut cmd: Commands,
     mut walk_timer: ResMut<WalkTimer>,
-    mut map: ResMut<EntityMap>,
+    mut idmap: ResMut<SimIdEntityIdMap>,
+    mut positions: ResMut<EntityPositionMap>,
+    mut payload: ResMut<BotPayload>,
     bot_assets: Res<bot_assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<bot_assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntities>,
@@ -175,18 +178,21 @@ fn on_new_entities(
 ) {
     for new_entities in new_entities.iter() {
         walk_timer.0.reset();
-        let len = map.0.len();
-        let mut prev = std::mem::replace(&mut map.0, HashMap::with_capacity(len));
-        let curr = &mut map.0;
+        let len = idmap.0.len();
+        let mut prev = std::mem::replace(&mut idmap.0, HashMap::with_capacity(len));
+        let curr = &mut idmap.0;
         curr.clear();
+        positions.0.clear();
+        payload.0.clear();
+
         for bot in new_entities.0.bots.iter() {
             let cao_id = SimEntityId(bot.id);
             let bot_id;
-            if let Some(bid) = prev.remove(&cao_id) {
-                curr.insert(cao_id, bid);
+            if let Some(entity) = prev.remove(&cao_id) {
+                curr.insert(cao_id, entity);
                 trace!("found entity {:?}", bot.id);
-                update_from_to(bid, bot, &mut bot_q);
-                bot_id = bid;
+                update_from_to(entity, bot, &mut bot_q);
+                bot_id = entity;
             } else {
                 let pos = &bot.pos;
                 let new_id = spawn_bot(
@@ -200,6 +206,8 @@ fn on_new_entities(
                 curr.insert(cao_id, new_id);
                 trace!("new entity {:?}", bot.id);
             }
+            positions.0.insert(bot.pos, (cao_id, bot_id));
+            payload.0.insert(cao_id, bot.clone());
             if let Some(mine) = &bot.mine_intent {
                 mining_event.send(MiningEvent {
                     bot_id,
@@ -281,7 +289,9 @@ impl Plugin for BotsPlugin {
                     .with_system(update_orient.system()),
             )
             .init_resource::<bot_assets::BotRenderingAssets>()
-            .init_resource::<EntityMap>()
+            .insert_resource(SimIdEntityIdMap(HashMap::with_capacity(1024)))
+            .insert_resource(EntityPositionMap(HashMap::with_capacity(1024)))
+            .insert_resource(BotPayload(HashMap::with_capacity(1024)))
             .add_asset::<bot_assets::BotMaterial>()
             .insert_resource(WalkTimer(Timer::from_seconds(STEP_TIME, false)));
     }

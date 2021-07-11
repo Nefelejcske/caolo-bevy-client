@@ -25,6 +25,7 @@ tungstenite = { version = "0.13" }
 futures = "0.3"
 fastrand = "1.4"
 atomic_enum = "0.1"
+arrayvec = "0.7"
 
 # Enable optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]

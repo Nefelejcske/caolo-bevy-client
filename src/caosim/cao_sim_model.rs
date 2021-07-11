@@ -39,7 +39,9 @@ pub struct EntitiesPayload {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Copy, Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Copy, Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Eq, Hash,
+)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct AxialPos {
@@ -80,7 +82,7 @@ pub struct MineIntent {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Carry {
-    pub value: Option<i64>,
+    pub value: i64,
     pub value_max: i64,
 }
 
@@ -183,13 +185,5 @@ pub struct Resource {
 #[serde(default)]
 pub struct ResourceType {
     #[serde(rename = "Energy")]
-    pub energy: Energy2,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(default)]
-pub struct Energy2 {
-    pub value: i64,
-    pub value_max: i64,
+    pub energy: Energy,
 }

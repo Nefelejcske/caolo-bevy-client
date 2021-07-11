@@ -22,9 +22,5 @@ void main() {
     vec4 vp = u_model * vec4(Vertex_Position, 1.0);
     gl_Position = u_view_proj * vp;
     V_Norm = Vertex_Normal;
-    if ( length(u_cursor.xz - vp.xz) < 1. ) {
-        V_Color = vec4(1.);
-    } else {
-        V_Color = Vertex_Color;
-    }
+    V_Color = Vertex_Color;
 }

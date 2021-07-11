@@ -1,14 +1,82 @@
+use crate::EntityType;
+use arrayvec::ArrayVec;
 use bevy::{
     prelude::*,
     render::camera::{Camera, CameraProjection, PerspectiveProjection},
 };
 
-use crate::{camera_control::RoomCameraTag, caosim::cao_sim_model::AxialPos};
+use crate::{
+    camera_control::RoomCameraTag,
+    caosim::{cao_sim_model::AxialPos, SimEntityId},
+};
+
+#[derive(Debug, Clone, Copy)]
+pub struct SelectedEntity {
+    pub entity: Option<(SimEntityId, Entity)>,
+    pub ty: EntityType,
+}
+
+impl Default for SelectedEntity {
+    fn default() -> Self {
+        Self {
+            entity: None,
+            ty: EntityType::Undefined,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EntitySelection {
+    pub click_id: i32,
+    pub axial: AxialPos,
+}
+
+impl Default for EntitySelection {
+    fn default() -> Self {
+        EntitySelection {
+            click_id: 0,
+            axial: AxialPos::default(),
+        }
+    }
+}
 
 #[derive(Default, Debug, Clone, Copy)]
-pub struct SelectedTile {
+pub struct HoveredTile {
     pub axial: AxialPos,
     pub world_pos: Vec3,
+}
+
+fn select_tile_system(
+    tile: Res<HoveredTile>,
+    keys: Res<Input<MouseButton>>,
+    mut selection: ResMut<EntitySelection>,
+    mut selected: ResMut<SelectedEntity>,
+    bots: Res<crate::bots::EntityPositionMap>,
+    // TODO: resources, structures
+) {
+    if keys
+        .get_just_pressed()
+        .any(|k| matches!(k, MouseButton::Left))
+    {
+        let is_new_tile = tile.axial != selection.axial;
+        if is_new_tile {
+            selection.click_id = 0;
+        } else {
+            selection.click_id += 1
+        }
+        selection.axial = tile.axial;
+        selected.entity = None;
+        let mut all: ArrayVec<_, 3> = ArrayVec::new();
+        if let Some(ids) = bots.0.get(&selection.axial).copied() {
+            all.push((ids, EntityType::Bot));
+        }
+        // TODO: resources, structures
+        selected.entity = (!all.is_empty()).then(|| {
+            let ind = selection.click_id as usize % all.len();
+            selected.ty = all[ind].1;
+            all[ind].0
+        });
+    }
 }
 
 fn window_to_world(
@@ -18,7 +86,7 @@ fn window_to_world(
     projection: &PerspectiveProjection,
 ) -> Vec3 {
     // normalized device coordinates
-    let norm = Vec3::new(
+    let ndc = Vec3::new(
         (2.0 * window_pos.x) / window.width() - 1.,
         (2.0 * window_pos.y) / window.height() - 1.,
         projection.near,
@@ -26,7 +94,7 @@ fn window_to_world(
 
     let ndc_to_world =
         cam_transform.compute_matrix() * projection.get_projection_matrix().inverse();
-    ndc_to_world.project_point3(norm)
+    ndc_to_world.project_point3(ndc)
 }
 
 /// intersect a given AB line with the plane of the terrain.
@@ -44,7 +112,7 @@ fn intersect_line_terrain_plain(a: Vec3, b: Vec3) -> Vec3 {
 }
 
 fn update_selected_tile_system(
-    mut st: ResMut<SelectedTile>,
+    mut st: ResMut<HoveredTile>,
     windows: Res<Windows>,
     mut cur_move: EventReader<CursorMoved>,
     q_cam: Query<(&GlobalTransform, &Camera, &PerspectiveProjection), With<RoomCameraTag>>,
@@ -81,9 +149,13 @@ pub struct RoomInteractionPlugin;
 
 impl Plugin for RoomInteractionPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.insert_resource(SelectedTile::default()).add_system_set(
-            SystemSet::on_update(crate::AppState::Room)
-                .with_system(update_selected_tile_system.system()),
-        );
+        app.insert_resource(HoveredTile::default())
+            .insert_resource(EntitySelection::default())
+            .insert_resource(SelectedEntity::default())
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::Room)
+                    .with_system(update_selected_tile_system.system())
+                    .with_system(select_tile_system.system()),
+            );
     }
 }

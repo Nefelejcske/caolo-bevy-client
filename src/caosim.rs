@@ -169,7 +169,8 @@ fn send_new_entities_system(
     mut on_new_entities: EventWriter<NewEntities>,
 ) {
     while let Ok(entities) = recv.0.recv_timeout(Duration::from_micros(1)) {
-        on_new_entities.send(entities);
+        let entities = entities.0;
+        on_new_entities.send(NewEntities(entities.clone()));
     }
 }
 
