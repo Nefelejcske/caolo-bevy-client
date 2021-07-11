@@ -13,4 +13,5 @@ pub struct BotRenderingAssets {
 pub struct BotMaterial {
     pub color: Color,
     pub time: f32,
+    pub selected: i32,
 }

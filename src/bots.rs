@@ -13,6 +13,7 @@ use bevy::{
 use crate::{
     caosim::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
     mining::MiningEvent,
+    room_interaction::SelectedEntity,
     AppState,
 };
 
@@ -55,6 +56,7 @@ fn spawn_bot(
     let material = materials.add(bot_assets::BotMaterial {
         color: Color::rgb(0.2, 0.8, 0.8),
         time: 0.0,
+        selected: 0,
     });
 
     let orient = Quat::default();
@@ -85,12 +87,18 @@ fn spawn_bot(
 
 fn update_bot_materials(
     time: Res<Time>,
+    selected: Res<SelectedEntity>,
     mut materials: ResMut<Assets<bot_assets::BotMaterial>>,
-    query: Query<&Handle<bot_assets::BotMaterial>>,
+    query: Query<(&Parent, &Handle<bot_assets::BotMaterial>)>,
 ) {
-    query.for_each_mut(move |handle| {
+    query.for_each_mut(move |(entity, handle)| {
         if let Some(mat) = materials.get_mut(&*handle) {
             mat.time = time.seconds_since_startup() as f32;
+            mat.selected = selected
+                .entity
+                .map(|(_, id)| id == **entity)
+                .map(|x| x as i32)
+                .unwrap_or(0);
         }
     });
 }
@@ -131,7 +139,7 @@ fn smoothstep(t: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-fn update_pos(
+fn update_pos_system(
     mut t: ResMut<WalkTimer>,
     time: Res<Time>,
     mut query: Query<(&LastPos, &NextPos, &mut CurrentPos)>,
@@ -145,7 +153,7 @@ fn update_pos(
     }
 }
 
-fn update_orient(
+fn update_orient_system(
     mut t: ResMut<WalkTimer>,
     mut query: Query<(&LastRotation, &NextRotation, &mut CurrentRotation), With<Bot>>,
 ) {
@@ -156,7 +164,7 @@ fn update_orient(
     }
 }
 
-fn on_new_entities(
+fn on_new_entities_system(
     mut cmd: Commands,
     mut walk_timer: ResMut<WalkTimer>,
     mut idmap: ResMut<SimIdEntityIdMap>,
@@ -249,7 +257,7 @@ fn update_from_to(
     }
 }
 
-fn setup(
+fn setup_system(
     asset_server: Res<AssetServer>,
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -278,15 +286,15 @@ fn setup(
 
 impl Plugin for BotsPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
+        app.add_startup_system(setup_system.system())
             .add_system_set(
                 SystemSet::on_update(AppState::Room)
-                    .with_system(update_pos.system())
-                    .with_system(on_new_entities.system())
+                    .with_system(update_pos_system.system())
+                    .with_system(on_new_entities_system.system())
                     .with_system(update_transform_pos.system())
                     .with_system(update_transform_rot.system())
                     .with_system(update_bot_materials.system())
-                    .with_system(update_orient.system()),
+                    .with_system(update_orient_system.system()),
             )
             .init_resource::<bot_assets::BotRenderingAssets>()
             .insert_resource(SimIdEntityIdMap(HashMap::with_capacity(1024)))
