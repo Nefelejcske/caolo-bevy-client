@@ -113,7 +113,7 @@ fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
 
 fn on_enter_system(current_room: Res<CurrentRoom>, client: Res<crate::caosim::CaoClient>) {
     info!("Sending initial room");
-    client.send_current_room(current_room.0);
+    client.send_subscribe_room(current_room.0);
 }
 
 fn on_reconnect_system(
@@ -123,7 +123,7 @@ fn on_reconnect_system(
 ) {
     for _ in on_reconnect.iter() {
         info!("Reconnect event received, sending current room");
-        client.send_current_room(current_room.0);
+        client.send_subscribe_room(current_room.0);
     }
 }
 

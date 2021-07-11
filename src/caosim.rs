@@ -111,10 +111,29 @@ impl CaoClient {
         self.send_message.0.send(pl).expect("Failed to send");
     }
 
-    pub fn send_current_room(&self, room: AxialPos) {
+    /// subscribes to given room updates
+    pub fn send_subscribe_room(&self, room: AxialPos) {
         let payload = serde_json::to_vec(&serde_json::json!({
             "ty": "room_id",
             "room_id": room
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
+    /// unsubscribes from given room updates
+    pub fn send_unsubscribe_room(&self, room: AxialPos) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "unsubscribe_room_id",
+            "room_id": room
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
+    pub fn send_unsubscribe_all(&self) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "clear_room_ids"
         }))
         .unwrap();
         self.send_message(tungstenite::Message::Binary(payload));
