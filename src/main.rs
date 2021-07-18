@@ -1,5 +1,6 @@
 mod bots;
 mod camera_control;
+mod caolang;
 mod caosim;
 mod main_menu;
 mod mining;
@@ -10,6 +11,9 @@ mod structures;
 mod terrain;
 
 use bevy::prelude::*;
+
+pub const API_BASE_URL: &str = "https://web-snorrwe.cloud.okteto.net";
+pub const WS_BASE_URL: &str = "wss://rt-snorrwe.cloud.okteto.net";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum AppState {
@@ -25,7 +29,7 @@ pub enum EntityType {
     Structure,
 }
 
-fn setup(asset_server: Res<AssetServer>) {
+fn setup_system(asset_server: Res<AssetServer>) {
     asset_server.watch_for_changes().unwrap();
 }
 
@@ -48,9 +52,10 @@ fn main() {
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(room_ui::RoomUiPlugin)
         .add_plugin(room_interaction::RoomInteractionPlugin)
+        .add_plugin(caolang::CaoLangPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
-        .add_startup_system(setup.system())
+        .add_startup_system(setup_system.system())
         .add_plugin(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .run();
 }

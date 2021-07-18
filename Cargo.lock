@@ -1083,6 +1083,7 @@ dependencies = [
  "crossbeam",
  "fastrand",
  "futures",
+ "futures-lite",
  "serde",
  "serde_json",
  "surf",

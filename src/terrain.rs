@@ -8,7 +8,10 @@ use bevy::{
     },
 };
 
-use crate::{bots::pos_2d_to_3d, caosim::Connected};
+use crate::{
+    bots::pos_2d_to_3d,
+    caosim::{cao_client::CaoClient, Connected},
+};
 use crate::{
     caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
     room_interaction::HoveredTile,
@@ -111,14 +114,14 @@ fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
     }
 }
 
-fn on_enter_system(current_room: Res<CurrentRoom>, client: Res<crate::caosim::CaoClient>) {
+fn on_enter_system(current_room: Res<CurrentRoom>, client: Res<CaoClient>) {
     info!("Sending initial room");
     client.send_subscribe_room(current_room.0);
 }
 
 fn on_reconnect_system(
     current_room: Res<CurrentRoom>,
-    client: Res<crate::caosim::CaoClient>,
+    client: Res<CaoClient>,
     mut on_reconnect: EventReader<Connected>,
 ) {
     for _ in on_reconnect.iter() {
