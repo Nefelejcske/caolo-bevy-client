@@ -123,19 +123,12 @@ pub struct Decay {
 pub struct Structure {
     pub id: i64,
     pub pos: AxialPos,
-    pub hp: Hp2,
+    pub hp: Hp,
     pub energy: Energy,
     pub energy_regen: i64,
-    pub owner: Owner2,
+    pub owner: Owner,
     #[serde(rename = "StructureType")]
     pub structure_type: StructureType,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Hp2 {
-    pub value: i64,
-    pub value_max: i64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -144,13 +137,6 @@ pub struct Hp2 {
 pub struct Energy {
     pub value: i64,
     pub value_max: i64,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(default)]
-pub struct Owner2 {
-    pub data: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

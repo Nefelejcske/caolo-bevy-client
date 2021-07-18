@@ -49,6 +49,7 @@ fn selected_entity_window_system(
     egui_ctx: Res<EguiContext>,
     mut selected_entity: ResMut<SelectedEntity>,
     bots: Res<crate::bots::BotPayload>,
+    structures: Res<crate::structures::StructurePayload>,
 ) {
     egui::Window::new("Selected Entity").show(egui_ctx.ctx(), |ui| {
         if let Some(selected) = selected_entity.entity {
@@ -75,6 +76,9 @@ fn selected_entity_window_system(
                                     decay.hp_amount, decay.interval, decay.time_remaining
                                 ));
                             }
+                            if let Some(owner) = &bot.owner {
+                                ui.label(format!("Owner: {}", owner.data));
+                            }
 
                             if let Some(say) = &bot.say {
                                 ui.label(format!("Bot says: {}", say));
@@ -84,8 +88,19 @@ fn selected_entity_window_system(
                         None => selected_entity.entity = None,
                     }
                 }
+                crate::EntityType::Structure => {
+                    match structures.0.get(&selected.0) {
+                        Some(ent) => {
+                            ui.label(format!("Position: {:?}", ent.pos));
+                            let hp = &ent.hp;
+                            ui.label(format!("Hp: {} / {}", hp.value, hp.value_max));
+                            ui.label(format!("Owner: {}", ent.owner.data));
+                        }
+                        // entity has died
+                        None => selected_entity.entity = None,
+                    }
+                }
                 crate::EntityType::Resource => todo!(),
-                crate::EntityType::Structure => todo!(),
             }
         }
     });

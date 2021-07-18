@@ -52,7 +52,8 @@ fn select_tile_system(
     mut selection: ResMut<EntitySelection>,
     mut selected: ResMut<SelectedEntity>,
     bots: Res<crate::bots::EntityPositionMap>,
-    // TODO: resources, structures
+    structures: Res<crate::structures::EntityPositionMap>,
+    // TODO: structures
 ) {
     if keys
         .get_just_pressed()
@@ -70,7 +71,10 @@ fn select_tile_system(
         if let Some(ids) = bots.0.get(&selection.axial).copied() {
             all.push((ids, EntityType::Bot));
         }
-        // TODO: resources, structures
+        if let Some(ids) = structures.0.get(&selection.axial).copied() {
+            all.push((ids, EntityType::Structure));
+        }
+        // TODO: resources
         selected.entity = (!all.is_empty()).then(|| {
             let ind = selection.click_id as usize % all.len();
             selected.ty = all[ind].1;

@@ -2,7 +2,7 @@ pub mod structure_assets;
 
 use crate::{
     bots::pos_2d_to_3d,
-    caosim::{hex_axial_to_pixel, NewEntities, SimEntityId},
+    caosim::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
 };
 use bevy::{
     ecs::system::EntityCommands,
@@ -14,8 +14,9 @@ use bevy::{
 };
 use std::collections::HashMap;
 
-#[derive(Default)]
+pub struct StructurePayload(pub HashMap<SimEntityId, crate::caosim::cao_sim_model::Structure>);
 pub struct StructureIdMap(pub HashMap<SimEntityId, Entity>);
+pub struct EntityPositionMap(pub HashMap<AxialPos, (SimEntityId, Entity)>);
 
 pub struct Structure;
 
@@ -65,6 +66,8 @@ fn update_materials_system(
 fn on_new_entities_system(
     mut cmd: Commands,
     mut entity_map: ResMut<StructureIdMap>,
+    mut positions: ResMut<EntityPositionMap>,
+    mut payload: ResMut<StructurePayload>,
     assets: Res<structure_assets::StructureRenderingAssets>,
     mut materials: ResMut<Assets<structure_assets::StructureMaterial>>,
     mut new_entities: EventReader<NewEntities>,
@@ -75,20 +78,24 @@ fn on_new_entities_system(
         let mut prev = std::mem::replace(&mut entity_map.0, HashMap::with_capacity(len));
         let curr = &mut entity_map.0;
         curr.clear();
-        for res in new_entities.0.structures.iter() {
-            let cao_id = SimEntityId(res.id);
-            if let Some(res_id) = prev.remove(&cao_id) {
-                trace!("found entity {:?}", res.id);
-                curr.insert(cao_id, res_id);
+        positions.0.clear();
+        payload.0.clear();
+        for structure in new_entities.0.structures.iter() {
+            let cao_id = SimEntityId(structure.id);
+            let structure_id;
+            if let Some(id) = prev.remove(&cao_id) {
+                trace!("found entity {:?}", structure.id);
+                curr.insert(cao_id, id);
                 let mut tr = res_q
-                    .get_mut(res_id)
+                    .get_mut(id)
                     .expect("Failed to query existing structure transform");
                 // when structures respawn they usually aren't destroyed, just re-transformed
-                let pos = &res.pos;
+                let pos = &structure.pos;
                 let pos = hex_axial_to_pixel(pos.q as f32, pos.r as f32);
                 tr.translation = pos_2d_to_3d(pos);
+                structure_id = id;
             } else {
-                let pos = &res.pos;
+                let pos = &structure.pos;
                 let new_id = spawn_structure(
                     &mut cmd,
                     hex_axial_to_pixel(pos.q as f32, pos.r as f32),
@@ -98,8 +105,11 @@ fn on_new_entities_system(
                 .id();
 
                 curr.insert(cao_id, new_id);
-                trace!("new entity {:?}", res.id);
+                trace!("new entity {:?}", structure.id);
+                structure_id = new_id;
             }
+            positions.0.insert(structure.pos, (cao_id, structure_id));
+            payload.0.insert(cao_id, structure.clone());
         }
         // these entities were not sent in the current tick
         for (_, dead_entity) in prev {
@@ -148,6 +158,8 @@ impl Plugin for StructuresPlugin {
             .add_system(update_materials_system.system())
             .init_resource::<structure_assets::StructureRenderingAssets>()
             .add_asset::<structure_assets::StructureMaterial>()
-            .init_resource::<StructureIdMap>();
+            .insert_resource(StructureIdMap(HashMap::with_capacity(1024)))
+            .insert_resource(StructurePayload(HashMap::with_capacity(1024)))
+            .insert_resource(EntityPositionMap(HashMap::with_capacity(1024)));
     }
 }
