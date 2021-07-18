@@ -6,6 +6,7 @@ mod mining;
 mod resources;
 mod room_interaction;
 mod room_ui;
+mod structures;
 mod terrain;
 
 use bevy::prelude::*;
@@ -41,6 +42,7 @@ fn main() {
         .add_plugin(terrain::TerrainPlugin)
         .add_plugin(camera_control::CameraControlPlugin)
         .add_plugin(resources::ResourcesPlugin)
+        .add_plugin(structures::StructuresPlugin)
         .add_plugin(mining::MiningPlugin)
         .add_plugin(main_menu::MainMenuPlugin)
         .add_plugin(bevy_egui::EguiPlugin)

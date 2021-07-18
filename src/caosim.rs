@@ -303,7 +303,7 @@ fn setup(client: Res<CaoClient>, state: Res<ConnectionStateRes>) {
                 }
             }
             state.store(ConnectionState::Closed, Ordering::Release);
-            msg_sender.abort(); // abort this future, otherwise we might send events to it it can not handle in the future
+            msg_sender.abort(); // abort this future, otherwise we might send events to it that it can not handle in the future
         }
     });
 }
