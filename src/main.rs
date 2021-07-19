@@ -1,7 +1,7 @@
 mod bots;
 mod camera_control;
-mod caolang;
-mod caosim;
+mod cao_lang_client;
+mod cao_sim_client;
 mod main_menu;
 mod mining;
 mod resources;
@@ -41,7 +41,7 @@ fn main() {
         })
         .insert_resource(DefaultTaskPoolOptions::default())
         .add_plugins(DefaultPlugins)
-        .add_plugin(caosim::CaoSimPlugin)
+        .add_plugin(cao_sim_client::CaoSimPlugin)
         .add_plugin(bots::BotsPlugin)
         .add_plugin(terrain::TerrainPlugin)
         .add_plugin(camera_control::CameraControlPlugin)
@@ -52,7 +52,7 @@ fn main() {
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(room_ui::RoomUiPlugin)
         .add_plugin(room_interaction::RoomInteractionPlugin)
-        .add_plugin(caolang::CaoLangPlugin)
+        .add_plugin(cao_lang_client::CaoLangPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup_system.system())

@@ -10,15 +10,15 @@ use bevy::{
 
 use crate::{
     bots::pos_2d_to_3d,
-    caosim::{cao_client::CaoClient, Connected},
+    cao_sim_client::{cao_client::CaoClient, Connected},
 };
 use crate::{
-    caosim::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
+    cao_sim_client::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
     room_interaction::HoveredTile,
 };
 
 pub struct TerrainPlugin;
-pub struct CurrentRoom(pub crate::caosim::cao_sim_model::AxialPos);
+pub struct CurrentRoom(pub crate::cao_sim_client::cao_sim_model::AxialPos);
 
 pub struct Room;
 
@@ -264,10 +264,9 @@ impl Plugin for TerrainPlugin {
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
-            .insert_resource(CurrentRoom(crate::caosim::cao_sim_model::AxialPos {
-                q: 15,
-                r: 15,
-            }))
+            .insert_resource(CurrentRoom(
+                crate::cao_sim_client::cao_sim_model::AxialPos { q: 15, r: 15 },
+            ))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }
 }

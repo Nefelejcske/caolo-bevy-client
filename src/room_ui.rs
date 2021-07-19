@@ -1,5 +1,5 @@
 use crate::{
-    caosim::{ConnectionStateRes, NewEntities, NewTerrain},
+    cao_sim_client::{ConnectionStateRes, NewEntities, NewTerrain},
     room_interaction::SelectedEntity,
 };
 use bevy::prelude::*;

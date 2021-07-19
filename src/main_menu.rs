@@ -1,5 +1,5 @@
 use crate::{
-    caosim::{ConnectionState, ConnectionStateRes},
+    cao_sim_client::{ConnectionState, ConnectionStateRes},
     AppState,
 };
 use bevy::prelude::*;

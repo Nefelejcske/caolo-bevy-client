@@ -1,4 +1,4 @@
-use crate::{bots::Bot, camera_control::RoomCameraTag, caosim::SimEntityId};
+use crate::{bots::Bot, camera_control::RoomCameraTag, cao_sim_client::SimEntityId};
 use bevy::prelude::*;
 
 #[derive(Debug)]

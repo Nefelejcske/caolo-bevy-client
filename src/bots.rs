@@ -11,7 +11,7 @@ use bevy::{
 };
 
 use crate::{
-    caosim::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
+    cao_sim_client::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
     mining::MiningEvent,
     room_interaction::SelectedEntity,
     AppState,
@@ -29,7 +29,7 @@ pub struct CurrentRotation(pub Quat);
 #[derive(Debug, Clone, Default)]
 struct WalkTimer(Timer);
 
-pub struct BotPayload(pub HashMap<SimEntityId, crate::caosim::cao_sim_model::Bot>);
+pub struct BotPayload(pub HashMap<SimEntityId, crate::cao_sim_client::cao_sim_model::Bot>);
 pub struct SimIdEntityIdMap(pub HashMap<SimEntityId, Entity>);
 pub struct EntityPositionMap(pub HashMap<AxialPos, (SimEntityId, Entity)>);
 
@@ -232,7 +232,7 @@ fn on_new_entities_system(
 
 fn update_from_to(
     bot_id: Entity,
-    bot: &crate::caosim::cao_sim_model::Bot,
+    bot: &crate::cao_sim_client::cao_sim_model::Bot,
     bot_q: &mut Query<
         (
             &mut LastPos,

@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::{input::mouse::MouseWheel, prelude::*};
 
-use crate::{caosim, AppState};
+use crate::{cao_sim_client, AppState};
 
 pub struct CameraControlPlugin;
 pub struct RoomCameraTag;
@@ -100,7 +100,7 @@ fn rig_input_system(
 }
 
 fn setup(mut cmd: Commands) {
-    let map_mid = caosim::hex_axial_to_pixel(30., 30.);
+    let map_mid = cao_sim_client::hex_axial_to_pixel(30., 30.);
     let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
 
     let outertr = Transform::from_translation(Vec3::new(map_mid.x, 0., map_mid.z));

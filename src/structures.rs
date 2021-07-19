@@ -2,7 +2,7 @@ pub mod structure_assets;
 
 use crate::{
     bots::pos_2d_to_3d,
-    caosim::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
+    cao_sim_client::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
 };
 use bevy::{
     ecs::system::EntityCommands,
@@ -14,7 +14,9 @@ use bevy::{
 };
 use std::collections::HashMap;
 
-pub struct StructurePayload(pub HashMap<SimEntityId, crate::caosim::cao_sim_model::Structure>);
+pub struct StructurePayload(
+    pub HashMap<SimEntityId, crate::cao_sim_client::cao_sim_model::Structure>,
+);
 pub struct StructureIdMap(pub HashMap<SimEntityId, Entity>);
 pub struct EntityPositionMap(pub HashMap<AxialPos, (SimEntityId, Entity)>);
 

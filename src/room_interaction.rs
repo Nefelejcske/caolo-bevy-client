@@ -7,7 +7,7 @@ use bevy::{
 
 use crate::{
     camera_control::RoomCameraTag,
-    caosim::{cao_sim_model::AxialPos, SimEntityId},
+    cao_sim_client::{cao_sim_model::AxialPos, SimEntityId},
 };
 
 #[derive(Debug, Clone, Copy)]

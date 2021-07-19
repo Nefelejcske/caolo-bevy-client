@@ -12,7 +12,7 @@ use bevy::{
 
 use crate::{
     bots::pos_2d_to_3d,
-    caosim::{hex_axial_to_pixel, NewEntities, SimEntityId},
+    cao_sim_client::{hex_axial_to_pixel, NewEntities, SimEntityId},
 };
 
 #[derive(Default)]
