@@ -1,3 +1,8 @@
+#[derive(serde::Serialize)]
+pub struct GetLayoutQuery {
+    pub radius: i32,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "ty", content = "payload")]

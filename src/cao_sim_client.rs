@@ -9,6 +9,7 @@ use bevy::{
     prelude::*,
     tasks::{IoTaskPool, Task},
 };
+use cao_sim_model::GetLayoutQuery;
 use futures::prelude::*;
 use futures_lite::future;
 
@@ -213,8 +214,10 @@ fn handle_tasks_system(
     });
 }
 
-async fn get_layout() -> Vec<AxialPos> {
+async fn get_layout(q: &GetLayoutQuery) -> Vec<AxialPos> {
     surf::get(format!("{}/world/room-terrain-layout", crate::API_BASE_URL))
+        .query(q)
+        .expect("Failed to set query param")
         .recv_json()
         .await
         .expect("Failed to get layout")
@@ -271,7 +274,10 @@ where
 
 fn setup_layout_task_system(mut commands: Commands, task_pool: Res<IoTaskPool>) {
     let handle = task_pool.spawn(async move {
-        let res = get_layout().await;
+        let res = get_layout(&GetLayoutQuery {
+            radius: 30, // TODO
+        })
+        .await;
         TerrainLayout(res)
     });
 
