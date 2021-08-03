@@ -1086,6 +1086,7 @@ dependencies = [
  "serde",
  "serde_json",
  "surf",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",

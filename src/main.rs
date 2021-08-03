@@ -1,3 +1,4 @@
+mod account;
 mod bots;
 mod camera_control;
 mod cao_lang_client;
@@ -53,6 +54,7 @@ fn main() {
         .add_plugin(room_ui::RoomUiPlugin)
         .add_plugin(room_interaction::RoomInteractionPlugin)
         .add_plugin(cao_lang_client::CaoLangPlugin)
+        .add_plugin(account::AccountPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup_system.system())

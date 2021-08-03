@@ -27,6 +27,7 @@ futures-lite = "1"
 fastrand = "1.4"
 atomic_enum = "0.1"
 arrayvec = "0.7"
+thiserror = "1"
 
 # Enable optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]
