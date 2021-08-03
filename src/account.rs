@@ -9,6 +9,7 @@ use futures_lite::future;
 pub type AuthToken = String;
 pub type LoginError = String;
 pub type LoginResult<T> = Result<T, LoginError>;
+pub type LoginRequestTask = Task<LoginResult<AuthToken>>;
 
 pub struct CurrentAuthToken(pub Option<AuthToken>);
 pub struct LastLoginError(pub Option<LoginError>);
@@ -67,7 +68,7 @@ fn handle_tasks_system(
     mut cmd: Commands,
     mut token: ResMut<CurrentAuthToken>,
     mut error: ResMut<LastLoginError>,
-    tasks: Query<(Entity, &mut Task<LoginResult<AuthToken>>)>,
+    tasks: Query<(Entity, &mut LoginRequestTask)>,
 ) {
     tasks.for_each_mut(|(e, mut t)| {
         if let Some(res) = future::block_on(future::poll_once(&mut *t)) {

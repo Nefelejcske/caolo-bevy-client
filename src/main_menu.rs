@@ -35,7 +35,9 @@ fn login_system(
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
     mut login_event: EventWriter<account::StartLoginEvent>,
     error: Res<account::LastLoginError>,
+    q_login: Query<(), With<account::LoginRequestTask>>,
 ) {
+    let has_login_request_in_flight = q_login.single().is_ok();
     egui::CentralPanel::default().show(egui_ctx.ctx(), |ui| {
         ui.vertical_centered(|ui| {
             ui.heading("Login");
@@ -54,8 +56,12 @@ fn login_system(
                 ui.add(egui::TextEdit::singleline(&mut local_event.password).password(true));
             });
 
-            if ui.button("Login").clicked() {
-                login_event.send(local_event.clone());
+            if has_login_request_in_flight {
+                ui.label("…");
+            } else {
+                if ui.button("Login").clicked() {
+                    login_event.send(local_event.clone());
+                }
             }
         });
     });
