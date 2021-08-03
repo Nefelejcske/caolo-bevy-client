@@ -1,3 +1,5 @@
+mod card_ui;
+
 use std::mem;
 
 use bevy::prelude::*;
@@ -10,116 +12,6 @@ use cao_lang::compiler::{CaoIr, Card};
 pub struct CurrentProgram(pub CaoIr);
 
 pub struct CaoLangEditorPlugin;
-
-fn card_ui(ui: &mut Ui, card: &mut Card) {
-    match card {
-        Card::Pass => {
-            ui.heading("Pass");
-        }
-        Card::Add => {
-            ui.heading("Add");
-        }
-        Card::Sub => {
-            ui.heading("Sub");
-        }
-        Card::Mul => {
-            ui.heading("Mul");
-        }
-        Card::Div => {
-            ui.heading("Div");
-        }
-        Card::CopyLast => {
-            ui.heading("CopyLast");
-        }
-        Card::Less => {
-            ui.heading("Less");
-        }
-        Card::LessOrEq => {
-            ui.heading("LessOrEq");
-        }
-        Card::Equals => {
-            ui.heading("Equals");
-        }
-        Card::NotEquals => {
-            ui.heading("NotEquals");
-        }
-        Card::Pop => {
-            ui.heading("Pop");
-        }
-        Card::ClearStack => {
-            ui.heading("ClearStack");
-        }
-        Card::And => {
-            ui.heading("And");
-        }
-        Card::Or => {
-            ui.heading("Or");
-        }
-        Card::Xor => {
-            ui.heading("Xor");
-        }
-        Card::Not => {
-            ui.heading("Not");
-        }
-        Card::Return => {
-            ui.heading("Return");
-        }
-        Card::ScalarNil => {
-            ui.heading("ScalarNil");
-        }
-        Card::CreateTable => {
-            ui.heading("CreateTable");
-        }
-        Card::Abort => {
-            ui.heading("Abort");
-        }
-        Card::SetProperty(_) => {
-            ui.heading("SetProperty");
-        }
-        Card::GetProperty(_) => {
-            ui.heading("GetProperty");
-        }
-        Card::ScalarInt(_) => {
-            ui.heading("ScalarInt");
-        }
-        Card::ScalarFloat(_) => {
-            ui.heading("ScalarFloat");
-        }
-        Card::StringLiteral(_) => {
-            ui.heading("StringLiteral");
-        }
-        Card::CallNative(_) => {
-            ui.heading("CallNative");
-        }
-        Card::IfTrue(_) => {
-            ui.heading("IfTrue");
-        }
-        Card::IfFalse(_) => {
-            ui.heading("IfFalse");
-        }
-        Card::IfElse { then, r#else } => {
-            ui.heading("IfElse");
-        }
-        Card::Jump(_) => {
-            ui.heading("Jump");
-        }
-        Card::SetGlobalVar(_) => {
-            ui.heading("SetGlobalVar");
-        }
-        Card::SetVar(_) => {
-            ui.heading("SetVar");
-        }
-        Card::ReadVar(_) => {
-            ui.heading("ReadVar");
-        }
-        Card::Repeat(_) => {
-            ui.heading("Repeat");
-        }
-        Card::While(_) => {
-            ui.heading("While");
-        }
-    }
-}
 
 fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
     let is_being_dragged = ui.memory().is_being_dragged(id);
@@ -222,7 +114,7 @@ fn editor_ui_system(
                         for (card_index, card) in lane.cards.iter_mut().enumerate() {
                             let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
                             drag_src(ui, id, |ui| {
-                                card_ui(ui, card);
+                                card_ui::card_ui(ui, card);
                             });
 
                             if ui.memory().is_being_dragged(id) {
