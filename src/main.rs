@@ -2,6 +2,7 @@ mod account;
 mod bots;
 mod camera_control;
 mod cao_lang_client;
+mod cao_lang_editor;
 mod cao_sim_client;
 mod main_menu;
 mod mining;
@@ -20,6 +21,7 @@ pub const WS_BASE_URL: &str = "wss://rt-snorrwe.cloud.okteto.net";
 pub enum AppState {
     MainMenu,
     Room,
+    CaoLangEditor,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -55,6 +57,7 @@ fn main() {
         .add_plugin(room_interaction::RoomInteractionPlugin)
         .add_plugin(cao_lang_client::CaoLangPlugin)
         .add_plugin(account::AccountPlugin)
+        .add_plugin(cao_lang_editor::CaoLangEditorPlugin)
         .add_state(AppState::MainMenu)
         .insert_resource(ClearColor(Color::rgb(0.34, 0.34, 0.34)))
         .add_startup_system(setup_system.system())

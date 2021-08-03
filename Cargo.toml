@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
 bevy = "0.5"
-bevy_egui = "0.5"
+bevy_egui = "0.6"
 cao-lang = { git = "https://github.com/caolo-game/cao-lang.git" }
 cao-math = { git = "https://github.com/caolo-game/cao-math.git" }
 surf = { version = "2" }

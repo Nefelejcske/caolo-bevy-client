@@ -37,21 +37,27 @@ fn login_system(
     error: Res<account::LastLoginError>,
 ) {
     egui::CentralPanel::default().show(egui_ctx.ctx(), |ui| {
-        ui.heading("Login");
+        ui.vertical_centered(|ui| {
+            ui.heading("Login");
 
-        if let Some(ref error) = error.0 {
-            ui.colored_label(egui::color::Rgba::RED, error);
-        }
+            if let Some(ref error) = error.0 {
+                ui.colored_label(egui::color::Rgba::RED, error);
+            }
 
-        ui.label("username");
-        ui.text_edit_singleline(&mut local_event.username);
-        ui.separator();
-        ui.label("password");
-        ui.add(egui::TextEdit::singleline(&mut local_event.password).password(true));
+            ui.horizontal(|ui| {
+                ui.label("username");
+                ui.text_edit_singleline(&mut local_event.username);
+            });
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label("password");
+                ui.add(egui::TextEdit::singleline(&mut local_event.password).password(true));
+            });
 
-        if ui.button("Login").clicked() {
-            login_event.send(std::mem::take(&mut *local_event));
-        }
+            if ui.button("Login").clicked() {
+                login_event.send(local_event.clone());
+            }
+        });
     });
 }
 
@@ -64,22 +70,29 @@ fn update_menu_system(
     let connected = matches!(connection_state, ConnectionState::Online);
 
     egui::CentralPanel::default().show(egui_ctx.ctx(), |ui| {
-        ui.horizontal(|ui| {
-            ui.label("Connection state: ");
+        ui.vertical_centered(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Connection state: ");
 
-            let pl = match connection_state {
-                ConnectionState::Connecting => "Connecting...",
-                ConnectionState::Online => "Online",
-                ConnectionState::Closed => "Closed",
-                ConnectionState::Error => "Error",
-            };
+                let pl = match connection_state {
+                    ConnectionState::Connecting => "Connecting...",
+                    ConnectionState::Online => "Online",
+                    ConnectionState::Closed => "Closed",
+                    ConnectionState::Error => "Error",
+                };
 
-            ui.label(pl);
+                ui.label(pl);
+            });
+
+            if connected {
+                if ui.button("Let's go").clicked() {
+                    state.set(AppState::Room).unwrap_or_default();
+                }
+                if ui.button("CaoLang").clicked() {
+                    state.set(AppState::CaoLangEditor).unwrap_or_default();
+                }
+            }
         });
-
-        if connected && ui.button("Let's go").clicked() {
-            state.set(AppState::Room).unwrap_or_default();
-        }
     });
 }
 

@@ -1,6 +1,7 @@
-use crate::EntityType;
+use crate::{AppState, EntityType};
 use arrayvec::ArrayVec;
 use bevy::{
+    ecs::schedule::ShouldRun,
     prelude::*,
     render::camera::{Camera, CameraProjection, PerspectiveProjection},
 };
@@ -9,6 +10,9 @@ use crate::{
     camera_control::RoomCameraTag,
     cao_sim_client::{cao_sim_model::AxialPos, SimEntityId},
 };
+
+#[derive(Debug, Clone, Copy)]
+pub struct EguiInteraction(pub bool);
 
 #[derive(Debug, Clone, Copy)]
 pub struct SelectedEntity {
@@ -149,6 +153,24 @@ fn update_selected_tile_system(
     }
 }
 
+fn update_interaction_system(
+    mut eguiint: ResMut<EguiInteraction>,
+    ctx: ResMut<bevy_egui::EguiContext>,
+) {
+    eguiint.0 = ctx.ctx().wants_pointer_input();
+}
+
+fn should_room_systems_run(
+    eguiint: Res<EguiInteraction>,
+    state: Res<State<AppState>>,
+) -> ShouldRun {
+    if !eguiint.0 && matches!(state.current(), AppState::Room) {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
+    }
+}
+
 pub struct RoomInteractionPlugin;
 
 impl Plugin for RoomInteractionPlugin {
@@ -156,8 +178,11 @@ impl Plugin for RoomInteractionPlugin {
         app.insert_resource(HoveredTile::default())
             .insert_resource(EntitySelection::default())
             .insert_resource(SelectedEntity::default())
+            .insert_resource(EguiInteraction(false))
+            .add_system(update_interaction_system.system())
             .add_system_set(
-                SystemSet::on_update(crate::AppState::Room)
+                SystemSet::new()
+                    .with_run_criteria(should_room_systems_run.system())
                     .with_system(update_selected_tile_system.system())
                     .with_system(select_tile_system.system()),
             );
