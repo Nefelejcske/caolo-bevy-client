@@ -11,6 +11,26 @@ use cao_lang::compiler::{CaoIr, Card};
 
 pub struct CurrentProgram(pub CaoIr);
 
+#[derive(Debug, Clone, Copy)]
+pub enum LaneIndex {
+    LaneId(usize),
+    SchemaLane,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OnCardDrop {
+    src_lane: LaneIndex,
+    dst_lane: LaneIndex,
+    src_card: usize,
+    dst_card: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct OnCardRemove {
+    src_lane: LaneIndex,
+    src_card: usize,
+}
+
 pub struct CaoLangEditorPlugin;
 
 fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
@@ -88,12 +108,50 @@ fn drop_target<R>(
     InnerResponse::new(ret, response)
 }
 
+fn on_card_remove_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<OnCardRemove>) {
+    let lanes = &mut ir.0.lanes;
+    for OnCardRemove { src_lane, src_card } in on_drop.iter().copied() {
+        match src_lane {
+            LaneIndex::LaneId(id) => {
+                lanes[id].cards.remove(src_card);
+            }
+            LaneIndex::SchemaLane => { /*noop*/ }
+        };
+    }
+}
+
+fn on_card_drop_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<OnCardDrop>) {
+    let lanes = &mut ir.0.lanes;
+    for OnCardDrop {
+        src_lane,
+        dst_lane,
+        src_card,
+        dst_card: _,
+    } in on_drop.iter().copied()
+    {
+        let card: Card = match src_lane {
+            LaneIndex::LaneId(id) => lanes[id].cards.remove(src_card),
+            LaneIndex::SchemaLane => todo!(),
+        };
+
+        match dst_lane {
+            LaneIndex::LaneId(id) => {
+                lanes[id].cards.push(card);
+            }
+            LaneIndex::SchemaLane => { /*noop*/ }
+        }
+    }
+}
+
 fn editor_ui_system(
-    mut ir: ResMut<CurrentProgram>,
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
+    mut ir: ResMut<CurrentProgram>,
+    mut on_drop: EventWriter<OnCardDrop>,
+    mut on_remove: EventWriter<OnCardRemove>,
 ) {
-    let mut drop_lane = None;
     let mut src_col_row = None;
+    let mut dst_col_row = None;
+    let mut dropped = false;
     for (lane_index, lane) in ir.0.lanes.iter_mut().enumerate() {
         let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
         egui::Window::new(name.as_str())
@@ -118,48 +176,62 @@ fn editor_ui_system(
                             });
 
                             if ui.memory().is_being_dragged(id) {
-                                src_col_row = Some((lane_index as i64, card_index));
+                                src_col_row = Some((LaneIndex::LaneId(lane_index), card_index));
                             }
                         }
                     })
                     .response;
 
-                    if ui.memory().is_anything_being_dragged() && resp.hovered() {
-                        drop_lane = Some(lane_index as i64);
+                    dropped = dropped || ui.input().pointer.any_released();
+                    if resp.hovered() {
+                        dst_col_row = Some((LaneIndex::LaneId(lane_index), 0)); // TODO: dst row
                     }
                 });
-                if let Some((source_lane, source_card)) = src_col_row {
-                    if let Some(drop_lane) = drop_lane {
-                        if ui.input().pointer.any_released() {
-                            // do the drop:
-                            dbg!("poggies", source_lane, source_card, drop_lane);
-                        }
-                    }
-                }
             });
         if lane.name.is_some() {
             // restore the lane name
             lane.name = Some(name);
         }
     }
+    if dropped {
+        if let Some((src_lane, src_card)) = src_col_row {
+            match dst_col_row {
+                Some((dst_lane, dst_card)) => {
+                    on_drop.send(OnCardDrop {
+                        src_lane,
+                        dst_lane,
+                        src_card,
+                        dst_card,
+                    });
+                }
+                None => {
+                    on_remove.send(OnCardRemove { src_lane, src_card });
+                }
+            }
+        }
+    }
 }
 
 impl Plugin for CaoLangEditorPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.insert_resource(CurrentProgram(CaoIr {
-            // lanes: Vec::with_capacity(4),
-            lanes: vec![
-                cao_lang::compiler::Lane::default(),
-                cao_lang::compiler::Lane::default()
-                    .with_name("pog")
-                    .with_card(Card::Pass)
-                    .with_card(Card::Add)
-                    .with_card(Card::Pass),
-            ],
-        }))
-        .add_system_set(
-            SystemSet::on_update(crate::AppState::CaoLangEditor)
-                .with_system(editor_ui_system.system()),
-        );
+        app.add_event::<OnCardDrop>()
+            .add_event::<OnCardRemove>()
+            .insert_resource(CurrentProgram(CaoIr {
+                // lanes: Vec::with_capacity(4),
+                lanes: vec![
+                    cao_lang::compiler::Lane::default(),
+                    cao_lang::compiler::Lane::default()
+                        .with_name("pog")
+                        .with_card(Card::Pass)
+                        .with_card(Card::Add)
+                        .with_card(Card::Pass),
+                ],
+            }))
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::CaoLangEditor)
+                    .with_system(on_card_drop_system.system())
+                    .with_system(on_card_remove_system.system())
+                    .with_system(editor_ui_system.system()),
+            );
     }
 }
