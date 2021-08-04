@@ -7,11 +7,13 @@ use bevy_egui::{
     egui::{self, color, CursorIcon, Id, InnerResponse, LayerId, Order, Sense, Shape, Ui},
     EguiContext,
 };
-use cao_lang::compiler::{CaoIr, Card};
+use cao_lang::compiler::{CaoIr, Card, Lane};
+
+use crate::cao_lang_client::{cao_lang_model::schema_to_card, CaoLangSchema};
 
 pub struct CurrentProgram(pub CaoIr);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LaneIndex {
     LaneId(usize),
     SchemaLane,
@@ -110,7 +112,9 @@ fn drop_target<R>(
 
 fn on_card_remove_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<OnCardRemove>) {
     let lanes = &mut ir.0.lanes;
-    for OnCardRemove { src_lane, src_card } in on_drop.iter().copied() {
+    for remove in on_drop.iter().copied() {
+        debug!("Remove event {:?}", remove);
+        let OnCardRemove { src_lane, src_card } = remove;
         match src_lane {
             LaneIndex::LaneId(id) => {
                 lanes[id].cards.remove(src_card);
@@ -120,18 +124,25 @@ fn on_card_remove_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReade
     }
 }
 
-fn on_card_drop_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<OnCardDrop>) {
+fn on_card_drop_system(
+    mut ir: ResMut<CurrentProgram>,
+    schema: Res<CaoLangSchema>,
+    mut on_drop: EventReader<OnCardDrop>,
+) {
     let lanes = &mut ir.0.lanes;
-    for OnCardDrop {
-        src_lane,
-        dst_lane,
-        src_card,
-        dst_card: _,
-    } in on_drop.iter().copied()
-    {
+    for drop in on_drop.iter().copied() {
+        debug!("Drop event {:?}", drop);
+
+        let OnCardDrop {
+            src_lane,
+            dst_lane,
+            src_card,
+            dst_card: _,
+        } = drop;
+
         let card: Card = match src_lane {
             LaneIndex::LaneId(id) => lanes[id].cards.remove(src_card),
-            LaneIndex::SchemaLane => todo!(),
+            LaneIndex::SchemaLane => schema_to_card(&schema.0[src_card]),
         };
 
         match dst_lane {
@@ -143,8 +154,96 @@ fn on_card_drop_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<
     }
 }
 
+fn schema_ui(
+    egui_ctx: &mut EguiContext,
+    schema: &CaoLangSchema,
+    src_col_row: &mut Option<(LaneIndex, usize)>,
+    dst_col_row: &mut Option<(LaneIndex, usize)>,
+    dropped: &mut bool,
+) {
+    egui::Window::new("Schema")
+        .scroll(true)
+        .id(egui::Id::new("cao-lang-schema"))
+        .show(egui_ctx.ctx(), |ui| {
+            ui.columns(1, |uis| {
+                let ui = &mut uis[0];
+                let resp = drop_target(ui, true, |ui| {
+                    for (card_index, card) in schema.0.iter().enumerate() {
+                        let id = Id::new("cao-lang-schema-item").with(card_index);
+                        drag_src(ui, id, |ui| {
+                            ui.heading(&card.name);
+                            ui.horizontal_wrapped(|ui| {
+                                ui.label(&card.description);
+                            });
+                        });
+
+                        if ui.memory().is_being_dragged(id) {
+                            *src_col_row = Some((LaneIndex::SchemaLane, card_index));
+                        }
+                    }
+                })
+                .response;
+
+                *dropped = *dropped || ui.input().pointer.any_released();
+                if resp.hovered() {
+                    *dst_col_row = Some((LaneIndex::SchemaLane, 0));
+                }
+            });
+        });
+}
+
+fn lane_ui(
+    lane: &mut Lane,
+    lane_index: LaneIndex,
+    egui_ctx: &mut EguiContext,
+    src_col_row: &mut Option<(LaneIndex, usize)>,
+    dst_col_row: &mut Option<(LaneIndex, usize)>,
+    dropped: &mut bool,
+) {
+    let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
+    egui::Window::new(name.as_str())
+        .scroll(true)
+        .resizable(false)
+        .id(egui::Id::new("cao-lang-lane").with(lane_index))
+        .show(egui_ctx.ctx(), |ui| {
+            ui.columns(1, |uis| {
+                let ui = &mut uis[0];
+                let resp = drop_target(ui, true, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Name: ");
+                        if ui.text_edit_singleline(&mut name).changed() {
+                            lane.name = Some(Default::default());
+                        }
+                    });
+
+                    for (card_index, card) in lane.cards.iter_mut().enumerate() {
+                        let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
+                        drag_src(ui, id, |ui| {
+                            card_ui::card_ui(ui, card);
+                        });
+
+                        if ui.memory().is_being_dragged(id) {
+                            *src_col_row = Some((lane_index, card_index));
+                        }
+                    }
+                })
+                .response;
+
+                *dropped = *dropped || ui.input().pointer.any_released();
+                if resp.hovered() {
+                    *dst_col_row = Some((lane_index, 0)); // TODO: dst row
+                }
+            });
+        });
+    if lane.name.is_some() {
+        // restore the lane name
+        lane.name = Some(name);
+    }
+}
+
 fn editor_ui_system(
-    egui_ctx: ResMut<EguiContext>, // exclusive ownership
+    mut egui_ctx: ResMut<EguiContext>, // exclusive ownership
+    schema: Res<CaoLangSchema>,
     mut ir: ResMut<CurrentProgram>,
     mut on_drop: EventWriter<OnCardDrop>,
     mut on_remove: EventWriter<OnCardRemove>,
@@ -152,46 +251,23 @@ fn editor_ui_system(
     let mut src_col_row = None;
     let mut dst_col_row = None;
     let mut dropped = false;
+
+    schema_ui(
+        &mut *egui_ctx,
+        &*schema,
+        &mut src_col_row,
+        &mut dst_col_row,
+        &mut dropped,
+    );
     for (lane_index, lane) in ir.0.lanes.iter_mut().enumerate() {
-        let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
-        egui::Window::new(name.as_str())
-            .scroll(false)
-            .resizable(false)
-            .id(egui::Id::new("cao-lang-lane").with(lane_index))
-            .show(egui_ctx.ctx(), |ui| {
-                ui.columns(1, |uis| {
-                    let ui = &mut uis[0];
-                    let resp = drop_target(ui, true, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label("Name: ");
-                            if ui.text_edit_singleline(&mut name).changed() {
-                                lane.name = Some(Default::default());
-                            }
-                        });
-
-                        for (card_index, card) in lane.cards.iter_mut().enumerate() {
-                            let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
-                            drag_src(ui, id, |ui| {
-                                card_ui::card_ui(ui, card);
-                            });
-
-                            if ui.memory().is_being_dragged(id) {
-                                src_col_row = Some((LaneIndex::LaneId(lane_index), card_index));
-                            }
-                        }
-                    })
-                    .response;
-
-                    dropped = dropped || ui.input().pointer.any_released();
-                    if resp.hovered() {
-                        dst_col_row = Some((LaneIndex::LaneId(lane_index), 0)); // TODO: dst row
-                    }
-                });
-            });
-        if lane.name.is_some() {
-            // restore the lane name
-            lane.name = Some(name);
-        }
+        lane_ui(
+            lane,
+            LaneIndex::LaneId(lane_index),
+            &mut *egui_ctx,
+            &mut src_col_row,
+            &mut dst_col_row,
+            &mut dropped,
+        );
     }
     if dropped {
         if let Some((src_lane, src_card)) = src_col_row {

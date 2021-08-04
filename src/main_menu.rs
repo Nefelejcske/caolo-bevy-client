@@ -34,6 +34,7 @@ fn login_system(
     mut local_event: Local<account::StartLoginEvent>,
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
     mut login_event: EventWriter<account::StartLoginEvent>,
+    mut state: ResMut<State<AppState>>,
     error: Res<account::LastLoginError>,
     q_login: Query<(), With<account::LoginRequestTask>>,
 ) {
@@ -62,6 +63,9 @@ fn login_system(
                 if ui.button("Login").clicked() {
                     login_event.send(local_event.clone());
                 }
+            }
+            if ui.button("CaoLang").clicked() {
+                state.set(AppState::CaoLangEditor).unwrap_or_default();
             }
         });
     });

@@ -1,4 +1,4 @@
-mod caolang_model;
+pub mod cao_lang_model;
 
 use bevy::{
     prelude::*,
@@ -6,7 +6,7 @@ use bevy::{
 };
 use futures_lite::future;
 
-pub struct CaoLangSchema(Vec<caolang_model::SchemaNode>);
+pub struct CaoLangSchema(pub Vec<cao_lang_model::SchemaNode>);
 
 pub struct CaoLangPlugin;
 
