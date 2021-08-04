@@ -240,6 +240,29 @@ fn lane_ui(
     }
 }
 
+fn compiler_ui_system(
+    egui_ctx: ResMut<EguiContext>, // exclusive ownership
+    ir: Res<CurrentProgram>,
+) {
+    egui::SidePanel::left("cao-lang-control").show(egui_ctx.ctx(), |ui| {
+        // TODO: don't compile every frame??
+        // TODO: compile async?
+        let res = cao_lang::compiler::compile(ir.0.clone(), None);
+
+        ui.heading("Compilation result");
+        match res {
+            Ok(_) => {
+                ui.colored_label(egui::color::Rgba::GREEN, "Success");
+            }
+            Err(err) => {
+                ui.colored_label(egui::color::Rgba::RED, err.to_string());
+            }
+        }
+        ui.separator();
+        // TODO: add lane
+    });
+}
+
 fn editor_ui_system(
     mut egui_ctx: ResMut<EguiContext>, // exclusive ownership
     schema: Res<CaoLangSchema>,
@@ -304,6 +327,7 @@ impl Plugin for CaoLangEditorPlugin {
             }))
             .add_system_set(
                 SystemSet::on_update(crate::AppState::CaoLangEditor)
+                    .with_system(compiler_ui_system.system())
                     .with_system(on_card_drop_system.system())
                     .with_system(on_card_remove_system.system())
                     .with_system(editor_ui_system.system()),
