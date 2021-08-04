@@ -203,7 +203,6 @@ fn lane_ui(
     let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
     egui::Window::new(name.as_str())
         .scroll(true)
-        .resizable(false)
         .id(egui::Id::new("cao-lang-lane").with(lane_index))
         .show(egui_ctx.ctx(), |ui| {
             ui.columns(1, |uis| {
