@@ -12,6 +12,7 @@ use cao_lang::compiler::{CaoIr, Card, Lane};
 use crate::cao_lang_client::{cao_lang_model::schema_to_card, CaoLangSchema};
 
 pub struct CurrentProgram(pub CaoIr);
+pub struct LaneNames(pub Vec<String>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LaneIndex {
@@ -27,12 +28,6 @@ pub struct OnCardDrop {
     dst_card: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct OnCardRemove {
-    src_lane: LaneIndex,
-    src_card: usize,
-}
-
 pub struct CaoLangEditorPlugin;
 
 fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
@@ -42,7 +37,7 @@ fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
         let response = ui.scope(body).response;
 
         // Check for drags:
-        let response = ui.interact(response.rect, id, Sense::drag());
+        let response = ui.interact(response.rect, id, Sense::click_and_drag());
         if response.hovered() {
             ui.output().cursor_icon = CursorIcon::Grab;
         }
@@ -108,20 +103,6 @@ fn drop_target<R>(
     );
 
     InnerResponse::new(ret, response)
-}
-
-fn on_card_remove_system(mut ir: ResMut<CurrentProgram>, mut on_drop: EventReader<OnCardRemove>) {
-    let lanes = &mut ir.0.lanes;
-    for remove in on_drop.iter().copied() {
-        debug!("Remove event {:?}", remove);
-        let OnCardRemove { src_lane, src_card } = remove;
-        match src_lane {
-            LaneIndex::LaneId(id) => {
-                lanes[id].cards.remove(src_card);
-            }
-            LaneIndex::SchemaLane => { /*noop*/ }
-        };
-    }
 }
 
 fn on_card_drop_system(
@@ -195,6 +176,7 @@ fn schema_ui(
 fn lane_ui(
     lane: &mut Lane,
     lane_index: LaneIndex,
+    lane_names: &LaneNames,
     egui_ctx: &mut EguiContext,
     src_col_row: &mut Option<(LaneIndex, usize)>,
     dst_col_row: &mut Option<(LaneIndex, usize)>,
@@ -218,7 +200,7 @@ fn lane_ui(
                     for (card_index, card) in lane.cards.iter_mut().enumerate() {
                         let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
                         drag_src(ui, id, |ui| {
-                            card_ui::card_ui(ui, card);
+                            card_ui::card_ui(ui, card, lane_names);
                         });
 
                         if ui.memory().is_being_dragged(id) {
@@ -263,12 +245,21 @@ fn compiler_ui_system(
     });
 }
 
+fn update_lane_names_system(ir: Res<CurrentProgram>, mut names: ResMut<LaneNames>) {
+    names.0 =
+        ir.0.lanes
+            .iter()
+            .map(|lane| lane.name.as_ref().map(|x| x.as_str()).unwrap_or(""))
+            .map(|x| x.to_string())
+            .collect();
+}
+
 fn editor_ui_system(
     mut egui_ctx: ResMut<EguiContext>, // exclusive ownership
     schema: Res<CaoLangSchema>,
     mut ir: ResMut<CurrentProgram>,
+    lane_names: Res<LaneNames>,
     mut on_drop: EventWriter<OnCardDrop>,
-    mut on_remove: EventWriter<OnCardRemove>,
 ) {
     let mut src_col_row = None;
     let mut dst_col_row = None;
@@ -285,6 +276,7 @@ fn editor_ui_system(
         lane_ui(
             lane,
             LaneIndex::LaneId(lane_index),
+            &*lane_names,
             &mut *egui_ctx,
             &mut src_col_row,
             &mut dst_col_row,
@@ -302,9 +294,7 @@ fn editor_ui_system(
                         dst_card,
                     });
                 }
-                None => {
-                    on_remove.send(OnCardRemove { src_lane, src_card });
-                }
+                None => { /* noop */ }
             }
         }
     }
@@ -313,11 +303,12 @@ fn editor_ui_system(
 impl Plugin for CaoLangEditorPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<OnCardDrop>()
-            .add_event::<OnCardRemove>()
+            .insert_resource(LaneNames(Vec::with_capacity(4)))
             .insert_resource(CurrentProgram(CaoIr {
                 // lanes: Vec::with_capacity(4),
                 lanes: vec![
-                    cao_lang::compiler::Lane::default(),
+                    cao_lang::compiler::Lane::default()
+                        .with_card(Card::IfTrue(cao_lang::compiler::LaneNode::LaneId(1))),
                     cao_lang::compiler::Lane::default()
                         .with_name("pog")
                         .with_card(Card::Pass)
@@ -329,7 +320,7 @@ impl Plugin for CaoLangEditorPlugin {
                 SystemSet::on_update(crate::AppState::CaoLangEditor)
                     .with_system(compiler_ui_system.system())
                     .with_system(on_card_drop_system.system())
-                    .with_system(on_card_remove_system.system())
+                    .with_system(update_lane_names_system.system())
                     .with_system(editor_ui_system.system()),
             );
     }
