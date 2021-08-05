@@ -37,7 +37,7 @@ fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
         let response = ui.scope(body).response;
 
         // Check for drags:
-        let response = ui.interact(response.rect, id, Sense::click_and_drag());
+        let response = ui.interact(response.rect, id, Sense::drag());
         if response.hovered() {
             ui.output().cursor_icon = CursorIcon::Grab;
         }
@@ -308,6 +308,7 @@ impl Plugin for CaoLangEditorPlugin {
                 // lanes: Vec::with_capacity(4),
                 lanes: vec![
                     cao_lang::compiler::Lane::default()
+                        .with_name("poggies")
                         .with_card(Card::IfTrue(cao_lang::compiler::LaneNode::LaneId(1))),
                     cao_lang::compiler::Lane::default()
                         .with_name("pog")
