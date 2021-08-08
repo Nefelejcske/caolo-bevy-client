@@ -1,10 +1,12 @@
-mod card_ui;
+mod card_widget;
 
 use std::mem;
 
 use bevy::prelude::*;
 use bevy_egui::{
-    egui::{self, color, CursorIcon, Id, InnerResponse, LayerId, Order, Sense, Shape, Ui},
+    egui::{
+        self, color, CursorIcon, Id, InnerResponse, LayerId, Order, Response, Sense, Shape, Ui,
+    },
     EguiContext,
 };
 use cao_lang::compiler::{CaoIr, Card, Lane};
@@ -181,9 +183,9 @@ fn lane_ui(
     src_col_row: &mut Option<(LaneIndex, usize)>,
     dst_col_row: &mut Option<(LaneIndex, usize)>,
     dropped: &mut bool,
-) {
+) -> Option<Response> {
     let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
-    egui::Window::new(name.as_str())
+    let response = egui::Window::new(name.as_str())
         .scroll(true)
         .id(egui::Id::new("cao-lang-lane").with(lane_index))
         .show(egui_ctx.ctx(), |ui| {
@@ -200,7 +202,7 @@ fn lane_ui(
                     for (card_index, card) in lane.cards.iter_mut().enumerate() {
                         let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
                         drag_src(ui, id, |ui| {
-                            card_ui::card_ui(ui, card, lane_names);
+                            card_widget::card_ui(ui, card, lane_names);
                         });
 
                         if ui.memory().is_being_dragged(id) {
@@ -220,6 +222,8 @@ fn lane_ui(
         // restore the lane name
         lane.name = Some(name);
     }
+
+    response
 }
 
 fn compiler_ui_system(
