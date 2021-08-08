@@ -32,13 +32,11 @@ pub struct OnCardDrop {
 
 pub struct CaoLangEditorPlugin;
 
-fn drag_src<R>(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui) -> R) {
+fn drag_src<R>(ui: &mut Ui, id: Id, mut body: impl FnMut(&mut Ui) -> R) {
     let is_being_dragged = ui.memory().is_being_dragged(id);
 
-    if !is_being_dragged {
-        let response = ui.scope(body).response;
-
-        // Check for drags:
+    if !is_being_dragged || ui.ctx().input().pointer.any_click() {
+        let response = ui.scope(&mut body).response;
         let response = ui.interact(response.rect, id, Sense::drag());
         if response.hovered() {
             ui.output().cursor_icon = CursorIcon::Grab;
