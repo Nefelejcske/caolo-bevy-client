@@ -36,6 +36,9 @@ fn drag_src<R>(ui: &mut Ui, id: Id, mut body: impl FnMut(&mut Ui) -> R) {
     let is_being_dragged = ui.memory().is_being_dragged(id);
 
     if !is_being_dragged || ui.ctx().input().pointer.any_click() {
+        // `any_click` is used to allow interaction with the body
+        // once https://github.com/emilk/egui/issues/547 is fixed we shouldn't need it
+        //
         let response = ui.scope(&mut body).response;
         let response = ui.interact(response.rect, id, Sense::drag());
         if response.hovered() {
