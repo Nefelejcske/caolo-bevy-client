@@ -1,20 +1,20 @@
 mod card_widget;
 
-use std::mem;
-
-use bevy::prelude::*;
+use crate::cao_lang_client::{cao_lang_model::schema_to_card, CaoLangSchema};
+use bevy::{prelude::*, tasks::Task};
 use bevy_egui::{
     egui::{
         self, color, CursorIcon, Id, InnerResponse, LayerId, Order, Response, Sense, Shape, Ui,
     },
     EguiContext,
 };
-use cao_lang::compiler::{CaoIr, Card, Lane};
-
-use crate::cao_lang_client::{cao_lang_model::schema_to_card, CaoLangSchema};
+use cao_lang::compiler::{CaoIr, Card, CompilationError, Lane};
+use futures_lite::future;
+use std::mem;
 
 pub struct CurrentProgram(pub CaoIr);
 pub struct LaneNames(pub Vec<String>);
+pub struct CurrentCompileError(pub Option<CompilationError>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LaneIndex {
@@ -237,24 +237,61 @@ fn lane_ui(
 
 fn compiler_ui_system(
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
-    ir: Res<CurrentProgram>,
+    compile_error: Res<CurrentCompileError>,
 ) {
     egui::SidePanel::left("cao-lang-control").show(egui_ctx.ctx(), |ui| {
-        // TODO: don't compile every frame??
-        // TODO: compile async?
-        let res = cao_lang::compiler::compile(ir.0.clone(), None);
-
         ui.heading("Compilation result");
-        match res {
-            Ok(_) => {
-                ui.colored_label(egui::color::Rgba::GREEN, "Success");
-            }
-            Err(err) => {
+        match compile_error.0.as_ref() {
+            Some(err) => {
                 ui.colored_label(egui::color::Rgba::RED, err.to_string());
+            }
+            None => {
+                ui.colored_label(egui::color::Rgba::GREEN, "Success");
             }
         }
         ui.separator();
     });
+}
+
+fn compiler_result_system(
+    mut cmd: Commands,
+    tasks: Query<(Entity, &mut Task<Result<(), CompilationError>>)>,
+    mut compile_error: ResMut<CurrentCompileError>,
+) {
+    tasks.for_each_mut(|(e, mut task)| {
+        if let Some(res) = future::block_on(future::poll_once(&mut *task)) {
+            match res {
+                Ok(_) => {
+                    compile_error.0 = None;
+                }
+                Err(err) => {
+                    compile_error.0 = Some(err);
+                }
+            }
+            cmd.entity(e).despawn_recursive();
+        }
+    });
+}
+
+// TODO: trigger on an event?
+fn compiler_system(
+    mut cmd: Commands,
+    ir: Res<CurrentProgram>,
+    tasks: Query<(), With<Task<Result<(), CompilationError>>>>,
+    pool: Res<bevy::tasks::AsyncComputeTaskPool>,
+) {
+    if tasks.iter().next().is_some() {
+        // compilation task is in progress
+        return;
+    }
+
+    let ir = ir.0.clone();
+    let task = pool.spawn(async move {
+        let result = cao_lang::compiler::compile(ir, None);
+        result.map(|_| {})
+    });
+
+    cmd.spawn().insert(task);
 }
 
 fn update_lane_names_system(ir: Res<CurrentProgram>, mut names: ResMut<LaneNames>) {
@@ -316,6 +353,7 @@ impl Plugin for CaoLangEditorPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<OnCardDrop>()
             .insert_resource(LaneNames(Vec::with_capacity(4)))
+            .insert_resource(CurrentCompileError(None))
             .insert_resource(CurrentProgram(CaoIr {
                 // lanes: Vec::with_capacity(4),
                 lanes: vec![
@@ -334,6 +372,8 @@ impl Plugin for CaoLangEditorPlugin {
                     .with_system(compiler_ui_system.system())
                     .with_system(on_card_drop_system.system())
                     .with_system(update_lane_names_system.system())
+                    .with_system(compiler_system.system())
+                    .with_system(compiler_result_system.system())
                     .with_system(editor_ui_system.system()),
             );
     }
