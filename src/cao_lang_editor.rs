@@ -121,7 +121,7 @@ fn on_card_drop_system(
             src_lane,
             dst_lane,
             src_card,
-            dst_card: _,
+            dst_card,
         } = drop;
 
         let card: Card = match src_lane {
@@ -131,7 +131,7 @@ fn on_card_drop_system(
 
         match dst_lane {
             LaneIndex::LaneId(id) => {
-                lanes[id].cards.push(card);
+                lanes[id].cards.insert(dst_card, card);
             }
             LaneIndex::SchemaLane => { /*noop*/ }
         }
@@ -191,6 +191,7 @@ fn lane_ui(
         .id(egui::Id::new("cao-lang-lane").with(lane_index))
         .show(egui_ctx.ctx(), |ui| {
             ui.columns(1, |uis| {
+                let mut dst_row = 0;
                 let ui = &mut uis[0];
                 let resp = drop_target(ui, true, |ui| {
                     ui.horizontal(|ui| {
@@ -203,7 +204,10 @@ fn lane_ui(
                     for (card_index, card) in lane.cards.iter_mut().enumerate() {
                         let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
                         drag_src(ui, id, |ui| {
-                            card_widget::card_ui(ui, card, lane_names);
+                            let response = card_widget::card_ui(ui, card, lane_names);
+                            if response.hovered() {
+                                dst_row = card_index
+                            }
                         });
 
                         if ui.memory().is_being_dragged(id) {
@@ -213,9 +217,13 @@ fn lane_ui(
                 })
                 .response;
 
+                if ui.input().pointer.any_released() {
+                    *dropped = true;
+                    ui.input().pointer.interact_pos();
+                }
                 *dropped = *dropped || ui.input().pointer.any_released();
                 if resp.hovered() {
-                    *dst_col_row = Some((lane_index, 0)); // TODO: dst row
+                    *dst_col_row = Some((lane_index, dst_row));
                 }
             });
         });
@@ -246,7 +254,6 @@ fn compiler_ui_system(
             }
         }
         ui.separator();
-        // TODO: add lane
     });
 }
 
