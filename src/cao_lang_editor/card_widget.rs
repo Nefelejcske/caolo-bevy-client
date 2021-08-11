@@ -1,8 +1,10 @@
-use bevy_egui::egui::{self, DragValue, Label, Response, Ui};
+use bevy_egui::egui::{self, DragValue, Label, Response, Shape, Ui};
 use cao_lang::{
     compiler::{Card, LaneNode, VarNode},
     VarName,
 };
+
+use crate::cao_lang_client::cao_lang_model::SchemaNode;
 
 use super::LaneNames;
 
@@ -41,76 +43,119 @@ fn variable_widget(ui: &mut Ui, label: impl Into<Label>, var: &mut VarNode) {
     });
 }
 
+pub fn schema_card_ui(ui: &mut Ui, card: &SchemaNode) {
+    let where_to_put_background = ui.painter().add(Shape::Noop);
+    let response = ui
+        .scope(|ui| {
+            ui.heading(&card.name);
+            ui.horizontal_wrapped(|ui| {
+                ui.label(&card.description);
+            });
+        })
+        .response;
+
+    let style = ui.visuals().widgets.inactive;
+    let rect = response.rect;
+
+    ui.painter().set(
+        where_to_put_background,
+        Shape::Rect {
+            corner_radius: style.corner_radius,
+            fill: style.bg_fill,
+            stroke: style.bg_stroke,
+            rect,
+        },
+    );
+}
+
 pub fn card_ui(ui: &mut Ui, card: &mut Card, names: &LaneNames, error: Option<String>) -> Response {
-    ui.scope(|ui| {
-        let heading = egui::Label::new(card.name());
-        let heading = if error.is_some() {
-            heading.background_color(egui::Color32::RED).strong()
-        } else {
-            heading
-        };
-        let heading = ui.heading(heading);
-        if let Some(error) = error {
-            heading.on_hover_text(error);
-        }
-        match card {
-            Card::SetGlobalVar(var) | Card::ReadVar(var) | Card::SetVar(var) => {
-                variable_widget(ui, "Variable", var);
+    let where_to_put_background = ui.painter().add(Shape::Noop);
+
+    let response = ui
+        .scope(|ui| {
+            let heading = egui::Label::new(card.name());
+            let heading = if error.is_some() {
+                heading.background_color(egui::Color32::RED).strong()
+            } else {
+                heading
+            };
+            let heading = ui.heading(heading);
+            if let Some(error) = error {
+                heading.on_hover_text(error);
             }
-            Card::SetProperty(var) | Card::GetProperty(var) => {
-                variable_widget(ui, "Property", var);
+            match card {
+                Card::SetGlobalVar(var) | Card::ReadVar(var) | Card::SetVar(var) => {
+                    variable_widget(ui, "Variable", var);
+                }
+                Card::SetProperty(var) | Card::GetProperty(var) => {
+                    variable_widget(ui, "Property", var);
+                }
+                Card::CallNative(node) => {
+                    ui.label(node.0.as_str());
+                }
+                Card::ScalarInt(node) => {
+                    ui.horizontal(|ui| {
+                        ui.label("value:");
+                        ui.add(DragValue::new(&mut node.0))
+                    });
+                }
+                Card::ScalarFloat(node) => {
+                    ui.horizontal(|ui| {
+                        ui.label("value:");
+                        ui.add(DragValue::new(&mut node.0))
+                    });
+                }
+                Card::StringLiteral(node) => {
+                    ui.text_edit_multiline(&mut node.0);
+                }
+                Card::IfElse { then, r#else } => {
+                    ui.label("then");
+                    lane_node_ui(ui, then, names);
+                    ui.label("else");
+                    lane_node_ui(ui, r#else, names);
+                }
+                Card::IfTrue(node)
+                | Card::IfFalse(node)
+                | Card::Jump(node)
+                | Card::Repeat(node)
+                | Card::While(node) => lane_node_ui(ui, node, names),
+                // empty bodied items
+                Card::Pass
+                | Card::Add
+                | Card::Sub
+                | Card::Mul
+                | Card::Div
+                | Card::CopyLast
+                | Card::Less
+                | Card::LessOrEq
+                | Card::Equals
+                | Card::NotEquals
+                | Card::Pop
+                | Card::ClearStack
+                | Card::And
+                | Card::Or
+                | Card::Xor
+                | Card::Not
+                | Card::Return
+                | Card::ScalarNil
+                | Card::CreateTable
+                | Card::Abort => {}
             }
-            Card::CallNative(node) => {
-                ui.label(node.0.as_str());
-            }
-            Card::ScalarInt(node) => {
-                ui.horizontal(|ui| {
-                    ui.label("value:");
-                    ui.add(DragValue::new(&mut node.0))
-                });
-            }
-            Card::ScalarFloat(node) => {
-                ui.horizontal(|ui| {
-                    ui.label("value:");
-                    ui.add(DragValue::new(&mut node.0))
-                });
-            }
-            Card::StringLiteral(node) => {
-                ui.text_edit_multiline(&mut node.0);
-            }
-            Card::IfElse { then, r#else } => {
-                ui.label("then");
-                lane_node_ui(ui, then, names);
-                ui.label("else");
-                lane_node_ui(ui, r#else, names);
-            }
-            Card::IfTrue(node)
-            | Card::IfFalse(node)
-            | Card::Jump(node)
-            | Card::Repeat(node)
-            | Card::While(node) => lane_node_ui(ui, node, names),
-            // empty bodied items
-            Card::Pass
-            | Card::Add
-            | Card::Sub
-            | Card::Mul
-            | Card::Div
-            | Card::CopyLast
-            | Card::Less
-            | Card::LessOrEq
-            | Card::Equals
-            | Card::NotEquals
-            | Card::Pop
-            | Card::ClearStack
-            | Card::And
-            | Card::Or
-            | Card::Xor
-            | Card::Not
-            | Card::Return
-            | Card::ScalarNil
-            | Card::CreateTable
-            | Card::Abort => {}
-        }
-    })
-    .response
+        })
+        .response;
+
+    let style = ui.visuals().widgets.inactive;
+    let rect = response.rect;
+
+    ui.painter().set(
+        where_to_put_background,
+        Shape::Rect {
+            corner_radius: style.corner_radius,
+            fill: style.bg_fill,
+            stroke: style.bg_stroke,
+            rect,
+        },
+    );
+
+    response
 }

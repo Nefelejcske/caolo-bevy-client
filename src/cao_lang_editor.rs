@@ -157,10 +157,7 @@ fn schema_ui(
                         for (card_index, card) in schema.0.iter().enumerate() {
                             let id = Id::new("cao-lang-schema-item").with(card_index);
                             drag_src(ui, id, |ui| {
-                                ui.heading(&card.name);
-                                ui.horizontal_wrapped(|ui| {
-                                    ui.label(&card.description);
-                                });
+                                card_widget::schema_card_ui(ui, card);
                             });
 
                             if ui.memory().is_being_dragged(id) {
