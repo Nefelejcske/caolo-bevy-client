@@ -31,9 +31,9 @@ fn lane_node_ui(ui: &mut Ui, node: &mut LaneNode, names: &LaneNames) {
 
 pub fn card_ui(ui: &mut Ui, card: &mut Card, names: &LaneNames, error: Option<String>) -> Response {
     ui.scope(|ui| {
-        let heading = egui::Label::new(card.name()).strong();
+        let heading = egui::Label::new(card.name());
         let heading = if error.is_some() {
-            heading.background_color(egui::Color32::RED)
+            heading.background_color(egui::Color32::RED).strong()
         } else {
             heading
         };
