@@ -1,6 +1,6 @@
-use bevy_egui::egui::{self, DragValue, Response, Ui};
+use bevy_egui::egui::{self, DragValue, Label, Response, Ui};
 use cao_lang::{
-    compiler::{Card, LaneNode},
+    compiler::{Card, LaneNode, VarNode},
     VarName,
 };
 
@@ -29,6 +29,18 @@ fn lane_node_ui(ui: &mut Ui, node: &mut LaneNode, names: &LaneNames) {
     }
 }
 
+fn variable_widget(ui: &mut Ui, label: impl Into<Label>, var: &mut VarNode) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        let mut payload = var.0.to_string();
+        if ui.text_edit_singleline(&mut payload).changed() {
+            if let Ok(res) = VarName::from(&payload) {
+                var.0 = res;
+            }
+        }
+    });
+}
+
 pub fn card_ui(ui: &mut Ui, card: &mut Card, names: &LaneNames, error: Option<String>) -> Response {
     ui.scope(|ui| {
         let heading = egui::Label::new(card.name());
@@ -42,20 +54,11 @@ pub fn card_ui(ui: &mut Ui, card: &mut Card, names: &LaneNames, error: Option<St
             heading.on_hover_text(error);
         }
         match card {
-            Card::SetGlobalVar(var)
-            | Card::ReadVar(var)
-            | Card::SetVar(var)
-            | Card::SetProperty(var)
-            | Card::GetProperty(var) => {
-                ui.horizontal(|ui| {
-                    ui.label("Variable ");
-                    let mut payload = var.0.to_string();
-                    if ui.text_edit_singleline(&mut payload).changed() {
-                        if let Ok(res) = VarName::from(&payload) {
-                            var.0 = res;
-                        }
-                    }
-                });
+            Card::SetGlobalVar(var) | Card::ReadVar(var) | Card::SetVar(var) => {
+                variable_widget(ui, "Variable", var);
+            }
+            Card::SetProperty(var) | Card::GetProperty(var) => {
+                variable_widget(ui, "Property", var);
             }
             Card::CallNative(node) => {
                 ui.label(node.0.as_str());
