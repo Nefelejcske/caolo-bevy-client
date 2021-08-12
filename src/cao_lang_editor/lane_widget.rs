@@ -17,6 +17,7 @@ pub fn lane_ui(
     dst_col_row: &mut Option<(LaneIndex, usize)>,
     dropped: &mut bool,
     compile_error: &CurrentCompileError,
+    open: &mut bool,
 ) -> Option<Response> {
     let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();
     let has_lane_error = compile_error
@@ -31,6 +32,7 @@ pub fn lane_ui(
     let lane_index = LaneIndex::LaneId(lane_index);
     let response = egui::Window::new(name.as_str())
         .scroll(true)
+        .open(open)
         .id(egui::Id::new("cao-lang-lane").with(lane_index))
         .show(egui_ctx.ctx(), |ui| {
             ui.columns(1, |uis| {

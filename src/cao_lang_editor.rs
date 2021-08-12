@@ -177,21 +177,26 @@ fn schema_ui(
         });
 }
 
-fn compiler_ui_system(
+fn left_ui_system(
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
     compile_error: Res<CurrentCompileError>,
+    mut ir: ResMut<CurrentProgram>,
 ) {
     egui::SidePanel::left("cao-lang-control").show(egui_ctx.ctx(), |ui| {
         ui.heading("Compilation result");
         match compile_error.0.as_ref() {
             Some(err) => {
-                ui.colored_label(egui::color::Rgba::RED, err.to_string());
+                ui.colored_label(egui::color::Rgba::RED, err.payload.to_string());
             }
             None => {
                 ui.colored_label(egui::color::Rgba::GREEN, "Success");
             }
         }
         ui.separator();
+
+        if ui.small_button("Add Lane").clicked() {
+            ir.0.lanes.push(Default::default());
+        }
     });
 }
 
@@ -264,7 +269,9 @@ fn editor_ui_system(
         &mut dst_col_row,
         &mut dropped,
     );
+    let mut closed_lane_idx = None;
     for (lane_index, lane) in ir.0.lanes.iter_mut().enumerate() {
+        let mut open = true;
         lane_widget::lane_ui(
             lane,
             lane_index,
@@ -274,7 +281,11 @@ fn editor_ui_system(
             &mut dst_col_row,
             &mut dropped,
             &*compile_error,
+            &mut open,
         );
+        if !open {
+            closed_lane_idx = Some(lane_index);
+        }
     }
     if dropped {
         if let Some((src_lane, src_card)) = src_col_row {
@@ -291,6 +302,9 @@ fn editor_ui_system(
             }
         }
     }
+    if let Some(i) = closed_lane_idx {
+        ir.0.lanes.remove(i);
+    }
 }
 
 impl Plugin for CaoLangEditorPlugin {
@@ -299,21 +313,11 @@ impl Plugin for CaoLangEditorPlugin {
             .insert_resource(LaneNames(Vec::with_capacity(4)))
             .insert_resource(CurrentCompileError(None))
             .insert_resource(CurrentProgram(CaoIr {
-                // lanes: Vec::with_capacity(4),
-                lanes: vec![
-                    cao_lang::compiler::Lane::default()
-                        .with_name("poggies")
-                        .with_card(Card::IfTrue(cao_lang::compiler::LaneNode::LaneId(1))),
-                    cao_lang::compiler::Lane::default()
-                        .with_name("pog")
-                        .with_card(Card::Pass)
-                        .with_card(Card::Add)
-                        .with_card(Card::Pass),
-                ],
+                lanes: Vec::with_capacity(4),
             }))
             .add_system_set(
                 SystemSet::on_update(crate::AppState::CaoLangEditor)
-                    .with_system(compiler_ui_system.system())
+                    .with_system(left_ui_system.system())
                     .with_system(on_card_drop_system.system())
                     .with_system(update_lane_names_system.system())
                     .with_system(compiler_system.system())
