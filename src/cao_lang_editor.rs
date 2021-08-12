@@ -38,10 +38,7 @@ fn drag_src<R>(ui: &mut Ui, id: Id, mut body: impl FnMut(&mut Ui) -> R) {
         // once https://github.com/emilk/egui/issues/547 is fixed we shouldn't need it
         //
         let response = ui.scope(&mut body).response;
-        let response = ui.interact(response.rect, id, Sense::drag());
-        if response.hovered() {
-            ui.output().cursor_icon = CursorIcon::Grab;
-        }
+        let _response = ui.interact(response.rect, id, Sense::drag());
     } else {
         ui.output().cursor_icon = CursorIcon::Grabbing;
 
@@ -124,8 +121,13 @@ fn on_card_drop_system(
         } = drop;
 
         let card: Card = match src_lane {
-            LaneIndex::LaneId(id) => lanes[id].cards.remove(src_card),
+            LaneIndex::LaneId(id) if lanes[id].cards.len() > src_card => {
+                lanes[id].cards.remove(src_card)
+            }
             LaneIndex::SchemaLane => schema_to_card(&schema.0[src_card]),
+            _ => {
+                continue;
+            }
         };
 
         match dst_lane {

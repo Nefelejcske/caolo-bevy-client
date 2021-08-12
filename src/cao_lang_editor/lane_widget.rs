@@ -49,6 +49,7 @@ pub fn lane_ui(
                             }
                         });
 
+                        let mut deleted_card_idx = None;
                         for (card_index, card) in lane.cards.iter_mut().enumerate() {
                             let mut is_this_errored = false;
                             if let Some(loc) = compile_error.0.as_ref().and_then(|x| x.loc.as_ref())
@@ -57,27 +58,36 @@ pub fn lane_ui(
                             }
 
                             let id = Id::new("cao-lang-item").with(lane_index).with(card_index);
+                            let error = is_this_errored.then(|| {
+                                compile_error
+                                    .0
+                                    .as_ref()
+                                    .map(|x| x.payload.to_string())
+                                    .unwrap()
+                            });
+                            let mut open = true;
                             drag_src(ui, id, |ui| {
                                 let response = card_widget::card_ui(
                                     ui,
                                     card,
                                     lane_names,
-                                    is_this_errored.then(|| {
-                                        compile_error
-                                            .0
-                                            .as_ref()
-                                            .map(|x| x.payload.to_string())
-                                            .unwrap()
-                                    }),
+                                    error.as_ref().map(|x| x.as_str()),
+                                    &mut open,
                                 );
                                 if response.hovered() {
                                     dst_row = card_index
                                 }
                             });
+                            if !open {
+                                deleted_card_idx = Some(card_index);
+                            }
 
                             if ui.memory().is_being_dragged(id) {
                                 *src_col_row = Some((lane_index, card_index));
                             }
+                        }
+                        if let Some(i) = deleted_card_idx {
+                            lane.cards.remove(i);
                         }
                     },
                     has_lane_error.then(|| {

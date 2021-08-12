@@ -68,21 +68,32 @@ pub fn schema_card_ui(ui: &mut Ui, card: &SchemaNode) {
     );
 }
 
-pub fn card_ui(ui: &mut Ui, card: &mut Card, names: &LaneNames, error: Option<String>) -> Response {
+pub fn card_ui(
+    ui: &mut Ui,
+    card: &mut Card,
+    names: &LaneNames,
+    error: Option<&str>,
+    open: &mut bool,
+) -> Response {
     let where_to_put_background = ui.painter().add(Shape::Noop);
 
     let response = ui
         .scope(|ui| {
-            let heading = egui::Label::new(card.name());
-            let heading = if error.is_some() {
-                heading.background_color(egui::Color32::RED).strong()
-            } else {
-                heading
-            };
-            let heading = ui.heading(heading);
-            if let Some(error) = error {
-                heading.on_hover_text(error);
-            }
+            ui.horizontal(|ui| {
+                let heading = egui::Label::new(card.name());
+                let heading = if error.is_some() {
+                    heading.background_color(egui::Color32::RED).strong()
+                } else {
+                    heading
+                };
+                let heading = ui.heading(heading);
+                if let Some(error) = error {
+                    heading.on_hover_text(error);
+                }
+                if ui.small_button("🗑").clicked() {
+                    *open = false;
+                }
+            });
             match card {
                 Card::SetGlobalVar(var) | Card::ReadVar(var) | Card::SetVar(var) => {
                     variable_widget(ui, "Variable", var);
