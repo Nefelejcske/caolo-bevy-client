@@ -6,6 +6,8 @@ use bevy::{
 };
 use futures_lite::future;
 
+use crate::cao_lang_client::cao_lang_model::SchemaNode;
+
 pub struct CaoLangSchema(pub Vec<cao_lang_model::SchemaNode>);
 
 pub struct CaoLangPlugin;
@@ -28,7 +30,30 @@ async fn get_schema() -> CaoLangSchema {
         .recv_json()
         .await
         .expect("Failed to get schema");
-    CaoLangSchema(payload)
+    debug!("Got schema payload {:#?}", payload);
+    let mut result = CaoLangSchema(payload);
+    let default_cards = cao_lang::compiler::card_description::get_instruction_descriptions();
+    result.0.extend(default_cards.iter().map(
+        |cao_lang::SubProgram {
+             name,
+             description,
+             ty,
+             output,
+             input,
+             properties,
+         }| {
+            SchemaNode {
+                name: name.to_string(),
+                ty: format!("{}", ty.as_str()),
+                description: description.to_string(),
+                input: input.iter().map(ToString::to_string).collect(),
+                output: output.iter().map(ToString::to_string).collect(),
+                properties: properties.iter().map(ToString::to_string).collect(),
+            }
+        },
+    ));
+
+    result
 }
 
 fn setup_schema_task_system(mut commands: Commands, task_pool: Res<IoTaskPool>) {

@@ -95,11 +95,12 @@ pub fn card_ui(
                 }
             });
             match card {
+                Card::ForEach { variable, lane } => {
+                    variable_widget(ui, "Variable", variable);
+                    lane_node_ui(ui, lane, names)
+                }
                 Card::SetGlobalVar(var) | Card::ReadVar(var) | Card::SetVar(var) => {
                     variable_widget(ui, "Variable", var);
-                }
-                Card::SetProperty(var) | Card::GetProperty(var) => {
-                    variable_widget(ui, "Property", var);
                 }
                 Card::CallNative(node) => {
                     ui.label(node.0.as_str());
@@ -132,6 +133,8 @@ pub fn card_ui(
                 | Card::While(node) => lane_node_ui(ui, node, names),
                 // empty bodied items
                 Card::Pass
+                | Card::SetProperty
+                | Card::GetProperty
                 | Card::Add
                 | Card::Sub
                 | Card::Mul
@@ -150,6 +153,7 @@ pub fn card_ui(
                 | Card::Return
                 | Card::ScalarNil
                 | Card::CreateTable
+                | Card::Len
                 | Card::Abort => {}
             }
         })

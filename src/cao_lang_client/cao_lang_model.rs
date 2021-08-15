@@ -8,9 +8,11 @@ use cao_lang::{
 pub struct SchemaNode {
     pub name: String,
     pub description: String,
-    pub inputs: Vec<String>,
     pub ty: String,
-    pub outputs: Vec<String>,
+    #[serde(rename="inputs")]
+    pub input: Vec<String>,
+    #[serde(rename="outputs")]
+    pub output: Vec<String>,
     pub properties: Vec<String>,
 }
 
@@ -54,8 +56,13 @@ pub fn schema_to_card(node: &SchemaNode) -> Card {
                 then: Default::default(),
                 r#else: Default::default(),
             },
-            "SetProperty" => Card::SetProperty(Default::default()),
-            "GetProperty" => Card::GetProperty(Default::default()),
+            "SetProperty" => Card::SetProperty,
+            "GetProperty" => Card::GetProperty,
+            "Len" => Card::Len,
+            "ForEach" => Card::ForEach {
+                variable: Default::default(),
+                lane: Default::default(),
+            },
             _ => todo!("Schema name {} is not implemented", node.name),
         },
         "Call" => Card::CallNative(Box::new(CallNode(
