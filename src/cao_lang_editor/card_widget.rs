@@ -37,7 +37,7 @@ fn variable_widget(ui: &mut Ui, label: impl Into<Label>, var: &mut VarNode) {
         let mut payload = var.0.to_string();
         if ui.text_edit_singleline(&mut payload).changed() {
             if let Ok(res) = VarName::from(&payload) {
-                var.0 = res;
+                var.0 = Box::new(res);
             }
         }
     });

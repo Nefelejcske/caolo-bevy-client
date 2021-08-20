@@ -236,7 +236,7 @@ fn compiler_system(
 
     let ir = ir.0.clone();
     let task = pool.spawn(async move {
-        let result = cao_lang::compiler::compile(ir, None);
+        let result = cao_lang::compiler::compile(&ir, None);
         result.map(|_| {})
     });
 
