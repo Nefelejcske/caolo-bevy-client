@@ -30,6 +30,18 @@ fn is_logged_in_system(
     }
 }
 
+fn login_via_env_system(mut login_event: EventWriter<account::StartLoginEvent>) {
+    let username = std::env::var("CAO_USERNAME");
+    if let Ok((username, password)) =
+        username.and_then(|uname| std::env::var("CAO_PW").map(|pw| (uname, pw)))
+    {
+        let event = account::StartLoginEvent { username, password };
+        login_event.send(event);
+    } else {
+        debug!("No login credentials were provided via env variables");
+    }
+}
+
 fn login_system(
     mut local_event: Local<account::StartLoginEvent>,
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
@@ -108,15 +120,16 @@ fn update_menu_system(
 
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_system_set(
-            SystemSet::new()
-                .with_system(update_menu_system.system())
-                .with_run_criteria(is_logged_in_system.system()),
-        )
-        .add_system_set(
-            SystemSet::new()
-                .with_system(login_system.system())
-                .with_run_criteria(is_not_logged_in_system.system()),
-        );
+        app.add_startup_system(login_via_env_system.system())
+            .add_system_set(
+                SystemSet::new()
+                    .with_system(update_menu_system.system())
+                    .with_run_criteria(is_logged_in_system.system()),
+            )
+            .add_system_set(
+                SystemSet::new()
+                    .with_system(login_system.system())
+                    .with_run_criteria(is_not_logged_in_system.system()),
+            );
     }
 }
