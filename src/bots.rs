@@ -162,8 +162,6 @@ type BotPosQuery<'a, 'b> = Query<
     With<Bot>,
 >;
 
-// TODO:
-// walk timer should be per entity...
 fn on_bot_move_system(
     mut moved_entities: EventReader<EntityMovedEvent>,
     mut bot_q: BotPosQuery,
