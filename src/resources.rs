@@ -91,7 +91,7 @@ fn on_resource_move_system(
         let (_res, meta, mut tr) = match res_data.get_mut(event.id) {
             Ok(b) => b,
             Err(err) => {
-                warn!(
+                trace!(
                     "Received resource moved event but the entity can't be queried {:?}",
                     err
                 );

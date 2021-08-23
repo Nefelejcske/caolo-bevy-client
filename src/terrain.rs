@@ -153,12 +153,18 @@ fn on_reconnect_system(
 
 fn update_terrain_material_system(
     selected_tile: Res<HoveredTile>,
+    current_room: Res<CurrentRoom>,
     mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
-    rooms: Query<&Handle<terrain_assets::TerrainMaterial>>,
+    rooms: Query<(&Room, &Handle<terrain_assets::TerrainMaterial>)>,
 ) {
-    for room_mat in rooms.iter() {
+    for (room_id, room_mat) in rooms.iter() {
         if let Some(mat) = materials.get_mut(room_mat) {
             mat.cursor_pos = selected_tile.world_pos;
+
+            let dq = current_room.0.q - room_id.0.q;
+            let dr = current_room.0.r - room_id.0.r;
+
+            mat.is_visible = (dq.abs() <= 1 && dr.abs() <= 1 && (dq + dr).abs() <= 1) as i32;
         }
     }
 }
@@ -202,6 +208,7 @@ fn handle_terrain_mesh_tasks_system(
 
             let material = materials.add(terrain_assets::TerrainMaterial {
                 cursor_pos: Vec3::ZERO,
+                is_visible: 1,
             });
 
             let transform = Transform::from_translation(offset);
