@@ -60,7 +60,7 @@ fn entity_gc_system(
 ) {
     let latest_timestamp = ts.0;
     for (e, se, meta) in q.iter() {
-        if (latest_timestamp - meta.ts) >= 2 {
+        if (latest_timestamp - meta.ts) >= 5 {
             trace!("Deleting dead entity {:?}", se);
             cmd.entity(e).despawn_recursive();
         }
