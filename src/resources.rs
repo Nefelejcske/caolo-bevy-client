@@ -9,7 +9,10 @@ use bevy::{
     },
 };
 
-use crate::cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent};
+use crate::{
+    cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_sim_client::cao_sim_model,
+};
 
 pub struct Resource;
 
@@ -77,6 +80,28 @@ fn on_new_entities(
     }
 }
 
+fn on_resource_move_system(
+    mut moved_entities: EventReader<EntityMovedEvent>,
+    mut res_data: Query<(&cao_sim_model::Resource, &EntityMetadata, &mut Transform)>,
+) {
+    for event in moved_entities
+        .iter()
+        .filter(|m| m.ty == crate::cao_entities::EntityType::Resource)
+    {
+        let (_res, meta, mut tr) = match res_data.get_mut(event.id) {
+            Ok(b) => b,
+            Err(err) => {
+                error!(
+                    "Received resource moved event but the entity can't be queried {:?}",
+                    err
+                );
+                continue;
+            }
+        };
+        tr.translation = pos_2d_to_3d(meta.pos.as_pixel());
+    }
+}
+
 fn setup(
     asset_server: Res<AssetServer>,
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
@@ -115,9 +140,10 @@ fn setup(
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
+            .add_system(on_new_entities.system())
+            .add_system(on_resource_move_system.system())
             .add_system_set(
                 SystemSet::on_update(crate::AppState::Room)
-                    .with_system(on_new_entities.system())
                     .with_system(update_res_materials.system()),
             )
             .add_asset::<resource_assets::ResourceMaterial>()
