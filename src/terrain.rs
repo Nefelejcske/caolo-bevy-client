@@ -229,7 +229,7 @@ fn handle_terrain_mesh_tasks_system(
 /// they aren't garbage collected
 fn touch_lru_system(current_room: Res<CurrentRoom>, mut offsets: ResMut<RoomOffsets>) {
     offsets.0.get(&current_room.0);
-    for neighbour in hex_neighbours(current_room.0) {
+    for neighbour in room_neighbours(current_room.0) {
         offsets.0.get(&neighbour);
     }
 }
@@ -329,7 +329,7 @@ fn setup(
     };
 }
 
-pub fn hex_neighbours(axial: AxialPos) -> [AxialPos; 6] {
+pub fn room_neighbours(axial: AxialPos) -> impl IntoIterator<Item = AxialPos> {
     let q = axial.q;
     let r = axial.r;
 
@@ -353,7 +353,7 @@ fn update_current_room_system(
         current_room.0 = room.0;
         client.send_unsubscribe_all();
         client.send_subscribe_room(current_room.0);
-        for neighbour in hex_neighbours(current_room.0) {
+        for neighbour in room_neighbours(current_room.0) {
             client.send_subscribe_room(neighbour);
         }
     }
@@ -378,7 +378,7 @@ impl Plugin for TerrainPlugin {
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
             .insert_resource(CurrentRoom(AxialPos { q: 15, r: 15 }))
-            .insert_resource(RoomOffsets(LruCache::new(16)))
+            .insert_resource(RoomOffsets(LruCache::new(32)))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }
 }

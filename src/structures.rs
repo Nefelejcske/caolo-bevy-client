@@ -9,7 +9,7 @@ use bevy::{
     },
 };
 
-use crate::cao_entities::{pos_2d_to_3d, NewEntityEvent, EntityMetadata};
+use crate::cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent};
 
 pub struct Structure;
 

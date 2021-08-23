@@ -9,9 +9,9 @@ pub struct SchemaNode {
     pub name: String,
     pub description: String,
     pub ty: String,
-    #[serde(rename="inputs")]
+    #[serde(rename = "inputs")]
     pub input: Vec<String>,
-    #[serde(rename="outputs")]
+    #[serde(rename = "outputs")]
     pub output: Vec<String>,
     pub properties: Vec<String>,
 }
