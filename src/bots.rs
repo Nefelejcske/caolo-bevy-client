@@ -1,8 +1,7 @@
 pub mod bot_assets;
 
-use std::collections::HashMap;
-
 use bevy::{
+    ecs::system::EntityCommands,
     prelude::*,
     render::{
         pipeline::{PipelineDescriptor, RenderPipeline},
@@ -11,7 +10,8 @@ use bevy::{
 };
 
 use crate::{
-    cao_sim_client::{cao_sim_model::AxialPos, hex_axial_to_pixel, NewEntities, SimEntityId},
+    cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_sim_client::cao_sim_model,
     mining::MiningEvent,
     room_interaction::SelectedEntity,
     AppState,
@@ -29,30 +29,16 @@ pub struct CurrentRotation(pub Quat);
 #[derive(Debug, Clone, Default)]
 struct WalkTimer(Timer);
 
-pub struct BotPayload(pub HashMap<SimEntityId, crate::cao_sim_client::cao_sim_model::Bot>);
-pub struct SimIdEntityIdMap(pub HashMap<SimEntityId, Entity>);
-pub struct EntityPositionMap(pub HashMap<AxialPos, (SimEntityId, Entity)>);
-
 pub struct BotsPlugin;
 
 pub const STEP_TIME: f32 = 0.8;
 
-// apply bot specific transformation
-fn bot_hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
-    let res = hex_axial_to_pixel(q, r);
-
-    let dx = (fastrand::f32() - 0.5) * 0.2;
-    let dy = (fastrand::f32() - 0.5) * 0.2;
-
-    res + Vec2::new(dx, dy - 0.2)
-}
-
-fn spawn_bot(
-    cmd: &mut Commands,
+fn build_bot(
+    cmd: &mut EntityCommands,
     pos: Vec2,
     assets: &bot_assets::BotRenderingAssets,
     materials: &mut Assets<bot_assets::BotMaterial>,
-) -> Entity {
+) {
     let material = materials.add(bot_assets::BotMaterial {
         color: Color::rgb(0.2, 0.8, 0.8),
         time: 0.0,
@@ -61,7 +47,7 @@ fn spawn_bot(
 
     let orient = Quat::default();
 
-    cmd.spawn_bundle((
+    cmd.insert_bundle((
         Bot,
         LastPos(pos),
         NextPos(pos),
@@ -71,6 +57,7 @@ fn spawn_bot(
         CurrentRotation(orient),
         Transform::default(),
         GlobalTransform::default(),
+        WalkTimer(Timer::from_seconds(STEP_TIME, false)),
     ))
     .with_children(|c| {
         c.spawn_bundle(MeshBundle {
@@ -81,8 +68,7 @@ fn spawn_bot(
             ..Default::default()
         })
         .insert(material);
-    })
-    .id()
+    });
 }
 
 fn update_bot_materials(
@@ -96,16 +82,11 @@ fn update_bot_materials(
             mat.time = time.seconds_since_startup() as f32;
             mat.selected = selected
                 .entity
-                .map(|(_, id)| id == **entity)
+                .map(|id| id == **entity)
                 .map(|x| x as i32)
                 .unwrap_or(0);
         }
     });
-}
-
-#[inline]
-pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
-    Vec3::new(p.x, 0.0, p.y)
 }
 
 fn update_transform_pos(mut query: Query<(&CurrentPos, &mut Transform)>) {
@@ -133,121 +114,121 @@ fn update_transform_rot(
     }
 }
 
+/// Does not clamp!
 #[inline]
 fn smoothstep(t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
 
-fn update_pos_system(
-    mut t: ResMut<WalkTimer>,
-    time: Res<Time>,
-    mut query: Query<(&LastPos, &NextPos, &mut CurrentPos)>,
-) {
-    t.0.tick(time.delta());
-    let WalkTimer(ref mut t) = &mut *t;
-    let t = t.elapsed_secs() / STEP_TIME;
-    let t = smoothstep(t);
-    for (last, next, mut curr) in query.iter_mut() {
-        curr.0 = last.0.lerp(next.0, t);
+fn update_walkies_system(time: Res<Time>, mut q: Query<&mut WalkTimer>) {
+    let delta = time.delta();
+    for mut t in q.iter_mut() {
+        t.0.tick(delta);
+    }
+}
+
+fn update_pos_system(mut query: Query<(&LastPos, &NextPos, &mut CurrentPos, &WalkTimer)>) {
+    for (last, next, mut curr, t) in query.iter_mut() {
+        curr.0 = last.0.lerp(next.0, smoothstep(t.0.percent()));
     }
 }
 
 fn update_orient_system(
-    mut t: ResMut<WalkTimer>,
-    mut query: Query<(&LastRotation, &NextRotation, &mut CurrentRotation), With<Bot>>,
+    mut query: Query<
+        (
+            &LastRotation,
+            &NextRotation,
+            &mut CurrentRotation,
+            &WalkTimer,
+        ),
+        With<Bot>,
+    >,
 ) {
-    let WalkTimer(ref mut t) = &mut *t;
-    let t = t.elapsed_secs() / STEP_TIME;
-    for (last, next, mut curr) in query.iter_mut() {
-        curr.0 = last.0.slerp(next.0, t);
+    for (last, next, mut curr, t) in query.iter_mut() {
+        let t = t.0.percent();
+        curr.0 = last.0.slerp(next.0, smoothstep(t));
+    }
+}
+
+type BotPosQuery<'a, 'b> = Query<
+    'a,
+    (
+        &'b mut LastPos,
+        &'b mut NextPos,
+        &'b mut LastRotation,
+        &'b mut NextRotation,
+        &'b mut WalkTimer,
+    ),
+    With<Bot>,
+>;
+
+// TODO:
+// walk timer should be per entity...
+fn on_bot_move_system(
+    mut moved_entities: EventReader<EntityMovedEvent>,
+    mut bot_q: BotPosQuery,
+    bot_data: Query<(&cao_sim_model::Bot, &EntityMetadata)>,
+) {
+    for event in moved_entities
+        .iter()
+        .filter(|m| m.ty == crate::cao_entities::EntityType::Bot)
+    {
+        let (bot, meta) = match bot_data.get(event.id) {
+            Ok(b) => b,
+            Err(err) => {
+                error!(
+                    "Received entity moved event but the entity can't be queried ({:?}): {:?}",
+                    event, err
+                );
+                continue;
+            }
+        };
+        update_from_to(meta.id, bot, &mut bot_q);
     }
 }
 
 fn on_new_entities_system(
     mut cmd: Commands,
-    mut walk_timer: ResMut<WalkTimer>,
-    mut idmap: ResMut<SimIdEntityIdMap>,
-    mut positions: ResMut<EntityPositionMap>,
-    mut payload: ResMut<BotPayload>,
     bot_assets: Res<bot_assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<bot_assets::BotMaterial>>,
-    mut new_entities: EventReader<NewEntities>,
-    mut mining_event: EventWriter<MiningEvent>,
-    mut bot_q: Query<
-        (
-            &mut LastPos,
-            &mut NextPos,
-            &mut LastRotation,
-            &mut NextRotation,
-        ),
-        With<Bot>,
-    >,
+    mut new_entities: EventReader<NewEntityEvent>,
+    q_meta: Query<&EntityMetadata>,
 ) {
-    for new_entities in new_entities.iter() {
-        walk_timer.0.reset();
-        let len = idmap.0.len();
-        let mut prev = std::mem::replace(&mut idmap.0, HashMap::with_capacity(len));
-        let curr = &mut idmap.0;
-        curr.clear();
-        positions.0.clear();
-        payload.0.clear();
+    for new_entity_event in new_entities
+        .iter()
+        .filter(|m| m.ty == crate::cao_entities::EntityType::Bot)
+    {
+        let meta = q_meta.get(new_entity_event.id).unwrap();
+        build_bot(
+            &mut cmd.entity(meta.id),
+            meta.pos.as_pixel(),
+            &*bot_assets,
+            &mut *bot_materials,
+        );
 
-        for bot in new_entities.0.bots.iter() {
-            let cao_id = SimEntityId(bot.id);
-            let bot_id;
-            if let Some(entity) = prev.remove(&cao_id) {
-                curr.insert(cao_id, entity);
-                trace!("found entity {:?}", bot.id);
-                update_from_to(entity, bot, &mut bot_q);
-                bot_id = entity;
-            } else {
-                let pos = &bot.pos;
-                let new_id = spawn_bot(
-                    &mut cmd,
-                    bot_hex_axial_to_pixel(pos.q as f32, pos.r as f32),
-                    &*bot_assets,
-                    &mut *bot_materials,
-                );
-                bot_id = new_id;
-
-                curr.insert(cao_id, new_id);
-                trace!("new entity {:?}", bot.id);
-            }
-            positions.0.insert(bot.pos, (cao_id, bot_id));
-            payload.0.insert(cao_id, bot.clone());
-            if let Some(mine) = &bot.mine_intent {
-                mining_event.send(MiningEvent {
-                    bot_id,
-                    resource_id: SimEntityId(mine.target_id),
-                });
-            }
-        }
-        // these entities were not sent in the current tick
-        for (_, dead_entity) in prev {
-            cmd.entity(dead_entity).despawn_recursive();
-        }
+        // TODO mining event
+        // if let Some(mine) = &bot.mine_intent {
+        //     mining_event.send(MiningEvent {
+        //         bot_id: meta.id,
+        //         resource_id: SimEntityId(mine.target_id),
+        //     });
+        // }
     }
 }
 
-fn update_from_to(
-    bot_id: Entity,
-    bot: &crate::cao_sim_client::cao_sim_model::Bot,
-    bot_q: &mut Query<
-        (
-            &mut LastPos,
-            &mut NextPos,
-            &mut LastRotation,
-            &mut NextRotation,
-        ),
-        With<Bot>,
-    >,
-) {
-    let (mut last_pos, mut next_pos, mut last_rot, mut next_rot) =
-        bot_q.get_mut(bot_id).expect("Failed to get bot components");
+fn update_from_to(bot_id: Entity, bot: &cao_sim_model::Bot, bot_q: &mut BotPosQuery) {
+    let (mut last_pos, mut next_pos, mut last_rot, mut next_rot, mut t) =
+        match bot_q.get_mut(bot_id) {
+            Ok(x) => x,
+            Err(err) => {
+                trace!("Failed to query bot {:?}", err);
+                return;
+            }
+        };
+    t.0.reset();
 
     last_pos.0 = next_pos.0;
-    next_pos.0 = bot_hex_axial_to_pixel(bot.pos.q as f32, bot.pos.r as f32);
+    next_pos.0 = bot.pos.as_pixel();
 
     last_rot.0 = next_rot.0;
     if next_pos.0 != last_pos.0 {
@@ -291,16 +272,14 @@ impl Plugin for BotsPlugin {
                 SystemSet::on_update(AppState::Room)
                     .with_system(update_pos_system.system())
                     .with_system(on_new_entities_system.system())
+                    .with_system(on_bot_move_system.system())
                     .with_system(update_transform_pos.system())
                     .with_system(update_transform_rot.system())
                     .with_system(update_bot_materials.system())
+                    .with_system(update_walkies_system.system())
                     .with_system(update_orient_system.system()),
             )
             .init_resource::<bot_assets::BotRenderingAssets>()
-            .insert_resource(SimIdEntityIdMap(HashMap::with_capacity(1024)))
-            .insert_resource(EntityPositionMap(HashMap::with_capacity(1024)))
-            .insert_resource(BotPayload(HashMap::with_capacity(1024)))
-            .add_asset::<bot_assets::BotMaterial>()
-            .insert_resource(WalkTimer(Timer::from_seconds(STEP_TIME, false)));
+            .add_asset::<bot_assets::BotMaterial>();
     }
 }

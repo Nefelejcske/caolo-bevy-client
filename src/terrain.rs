@@ -1,26 +1,36 @@
 mod terrain_assets;
 
+use std::time;
+
 use bevy::{
     prelude::*,
     render::{
         pipeline::{PipelineDescriptor, RenderPipeline},
         render_graph,
     },
+    tasks::{AsyncComputeTaskPool, Task},
 };
+use futures_lite::future;
 
 use crate::{
-    bots::pos_2d_to_3d,
-    cao_sim_client::{cao_client::CaoClient, Connected},
-};
-use crate::{
-    cao_sim_client::{cao_sim_model::TerrainTy, hex_axial_to_pixel, NewTerrain},
+    cao_entities::pos_2d_to_3d,
+    cao_sim_client::{
+        cao_client::CaoClient,
+        cao_sim_model::{AxialPos, TerrainTy},
+        hex_axial_to_pixel, Connected, NewTerrain,
+    },
     room_interaction::HoveredTile,
 };
+use lru::LruCache;
 
 pub struct TerrainPlugin;
-pub struct CurrentRoom(pub crate::cao_sim_client::cao_sim_model::AxialPos);
+pub struct CurrentRoom(pub AxialPos);
+pub struct NewCurrentRoom(pub AxialPos);
 
-pub struct Room;
+pub struct Room(pub AxialPos);
+
+/// room_id → offset
+pub struct RoomOffsets(pub LruCache<AxialPos, AxialPos>);
 
 fn terrain2color(ty: TerrainTy) -> Color {
     match ty {
@@ -28,6 +38,15 @@ fn terrain2color(ty: TerrainTy) -> Color {
         TerrainTy::Plain => Color::rgb(0.4, 0.3, 0.0),
         TerrainTy::Wall => Color::rgb(0.5, 0.1, 0.0),
         TerrainTy::Bridge => Color::rgb(0.0, 0.8, 0.0),
+    }
+}
+
+fn room_gc_system(mut cmd: Commands, offsets: Res<RoomOffsets>, q: Query<(Entity, &Room)>) {
+    for (e, room) in q.iter() {
+        if !offsets.0.contains(&room.0) {
+            trace!("Garbage collecting room {:?}", room.0);
+            cmd.entity(e).despawn_recursive();
+        }
     }
 }
 
@@ -114,19 +133,21 @@ fn _build_hex_prism_sides(vertex0ind: u16, indices: &mut Vec<u16>) {
     }
 }
 
-fn on_enter_system(current_room: Res<CurrentRoom>, client: Res<CaoClient>) {
+fn on_enter_system(mut new_rooms: EventWriter<NewCurrentRoom>) {
     info!("Sending initial room");
-    client.send_subscribe_room(current_room.0);
+    // TODO:
+    // some smarter way to get the initial room...
+    new_rooms.send(NewCurrentRoom(AxialPos { q: 17, r: 10 }));
 }
 
 fn on_reconnect_system(
     current_room: Res<CurrentRoom>,
-    client: Res<CaoClient>,
     mut on_reconnect: EventReader<Connected>,
+    mut new_rooms: EventWriter<NewCurrentRoom>,
 ) {
-    for _ in on_reconnect.iter() {
+    if on_reconnect.iter().next().is_some() {
         info!("Reconnect event received, sending current room");
-        client.send_subscribe_room(current_room.0);
+        new_rooms.send(NewCurrentRoom(current_room.0));
     }
 }
 
@@ -142,83 +163,140 @@ fn update_terrain_material_system(
     }
 }
 
+struct TerrainMeshResult {
+    start: time::Instant,
+    mesh: Mesh,
+    id: AxialPos,
+    offset: Vec3,
+}
+
+fn handle_terrain_mesh_tasks_system(
+    mut cmd: Commands,
+    mut tasks: Query<(Entity, &mut Task<TerrainMeshResult>)>,
+    assets: Res<terrain_assets::TerrainRenderingAssets>,
+    mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    existing_rooms: Query<(Entity, &Room)>,
+) {
+    // TODO: if we split the terrain task into stages we can update all of them here
+    for (e, mut task) in tasks.iter_mut().take(2) {
+        if let Some(mesh) = future::block_on(future::poll_once(&mut *task)) {
+            let TerrainMeshResult {
+                start,
+                mesh,
+                id,
+                offset,
+            } = mesh;
+
+            // clean up
+            cmd.entity(e).despawn_recursive();
+
+            for (e, room) in existing_rooms.iter() {
+                if room.0 == id {
+                    cmd.entity(e).despawn_recursive();
+                }
+            }
+
+            // spawn the new mesh
+            let mesh_handle = meshes.add(mesh);
+
+            let material = materials.add(terrain_assets::TerrainMaterial {
+                cursor_pos: Vec3::ZERO,
+            });
+
+            let transform = Transform::from_translation(offset);
+
+            cmd.spawn_bundle(MeshBundle {
+                mesh: mesh_handle,
+                render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                    assets.pipeline.clone_weak(),
+                )]),
+                ..Default::default()
+            })
+            .insert(material)
+            .insert(transform)
+            .insert(Room(id));
+
+            let end = std::time::Instant::now();
+
+            let dur = end - start;
+            info!("New terrain processing done in {:?}", dur);
+        }
+    }
+}
+
+/// touch the current room and neighbours in the LRU cache to move them to the top of the LRU so
+/// they aren't garbage collected
+fn touch_lru_system(current_room: Res<CurrentRoom>, mut offsets: ResMut<RoomOffsets>) {
+    offsets.0.get(&current_room.0);
+    for neighbour in hex_neighbours(current_room.0) {
+        offsets.0.get(&neighbour);
+    }
+}
+
 fn on_new_terrain_system(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
-    assets: Res<terrain_assets::TerrainRenderingAssets>,
-    mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
-    existing_tiles: Query<Entity, With<Room>>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    mut offsets: ResMut<RoomOffsets>,
+    pool: Res<AsyncComputeTaskPool>,
 ) {
     for new_terrain in new_terrain.iter() {
         info!("Got new terrain {:?}", new_terrain.room_id);
         let start = std::time::Instant::now();
+        offsets.0.put(new_terrain.room_id, new_terrain.offset);
+        let room_id = new_terrain.room_id;
+        let offset = new_terrain.offset;
+        let new_terrain = new_terrain.terrain.clone();
+        let task = pool.spawn(async move {
+            let mut vertices = Vec::with_capacity(new_terrain.len() * 6);
+            let mut indices = Vec::with_capacity(new_terrain.len() * 6);
+            let mut colors = Vec::with_capacity(new_terrain.len() * 6);
+            let mut normals = Vec::with_capacity(new_terrain.len() * 6);
+            for (p, ty) in new_terrain.iter() {
+                let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
+                let mut p = pos_2d_to_3d(p);
+                p.y -= 1.0;
 
-        for e in existing_tiles.iter() {
-            // TODO: maybe update these instead of despawning all...?
-            cmd.entity(e).despawn_recursive();
-        }
+                let color = terrain2color(*ty);
 
-        let mut vertices = Vec::with_capacity(new_terrain.terrain.len() * 6);
-        let mut indices = Vec::with_capacity(new_terrain.terrain.len() * 6);
-        let mut colors = Vec::with_capacity(new_terrain.terrain.len() * 6);
-        let mut normals = Vec::with_capacity(new_terrain.terrain.len() * 6);
-        for (p, ty) in new_terrain.terrain.iter() {
-            let p = &p;
-            let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
-            let mut p = pos_2d_to_3d(p);
-            p.y -= 1.0;
+                let ys: &[f32] = match *ty {
+                    TerrainTy::Wall => &[-1., 0.34],
+                    _ => &[-1.],
+                };
+                let l = ys.len();
+                let vertex0ind = vertices.len() as u16;
 
-            let color = terrain2color(*ty);
+                _build_hex_prism_bases(
+                    ys,
+                    p,
+                    color,
+                    0.95,
+                    &mut vertices,
+                    &mut indices,
+                    &mut colors,
+                    &mut normals,
+                );
 
-            let ys: &[f32] = match *ty {
-                TerrainTy::Wall => &[-1., 0.34],
-                _ => &[-1.],
-            };
-            let l = ys.len();
-            let vertex0ind = vertices.len() as u16;
-
-            _build_hex_prism_bases(
-                ys,
-                p,
-                color,
-                0.95,
-                &mut vertices,
-                &mut indices,
-                &mut colors,
-                &mut normals,
-            );
-
-            debug_assert!(l <= 2);
-            if l == 2 {
-                _build_hex_prism_sides(vertex0ind, &mut indices);
+                debug_assert!(l <= 2);
+                if l == 2 {
+                    _build_hex_prism_sides(vertex0ind, &mut indices);
+                }
             }
-        }
-        let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-        mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-        mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
+            let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
+            mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+            mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+            mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+            mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
 
-        let mesh = meshes.add(mesh);
-
-        let material = materials.add(terrain_assets::TerrainMaterial {
-            cursor_pos: Vec3::ZERO,
+            TerrainMeshResult {
+                start,
+                mesh,
+                id: room_id,
+                offset: pos_2d_to_3d(hex_axial_to_pixel(offset.q as f32, offset.r as f32)),
+            }
         });
 
-        cmd.spawn_bundle(MeshBundle {
-            mesh,
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                assets.pipeline.clone_weak(),
-            )]),
-            ..Default::default()
-        })
-        .insert(material)
-        .insert(Room);
-        let end = std::time::Instant::now();
-
-        let dur = end - start;
-        info!("New terrain processing done in {:?}", dur);
+        cmd.spawn().insert(task);
     }
 }
 
@@ -251,9 +329,44 @@ fn setup(
     };
 }
 
+pub fn hex_neighbours(axial: AxialPos) -> [AxialPos; 6] {
+    let q = axial.q;
+    let r = axial.r;
+
+    [
+        AxialPos { q: q + 1, r },
+        AxialPos { q: q + 1, r: r - 1 },
+        AxialPos { q, r: r - 1 },
+        AxialPos { q: q - 1, r },
+        AxialPos { q: q - 1, r: r + 1 },
+        AxialPos { q, r: r + 1 },
+    ]
+}
+
+fn update_current_room_system(
+    mut incoming: EventReader<NewCurrentRoom>,
+    mut current_room: ResMut<CurrentRoom>,
+    client: Res<CaoClient>,
+) {
+    for room in incoming.iter() {
+        debug!("Change main room to: {:?}", room.0);
+        current_room.0 = room.0;
+        client.send_unsubscribe_all();
+        client.send_subscribe_room(current_room.0);
+        for neighbour in hex_neighbours(current_room.0) {
+            client.send_subscribe_room(neighbour);
+        }
+    }
+}
+
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
+        app.add_event::<NewCurrentRoom>()
+            .add_startup_system(setup.system())
+            .add_system(update_current_room_system.system())
+            .add_system(handle_terrain_mesh_tasks_system.system())
+            .add_system(room_gc_system.system())
+            .add_system(touch_lru_system.system())
             .add_system_set(
                 SystemSet::on_enter(crate::AppState::Room).with_system(on_enter_system.system()),
             )
@@ -264,9 +377,8 @@ impl Plugin for TerrainPlugin {
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
-            .insert_resource(CurrentRoom(
-                crate::cao_sim_client::cao_sim_model::AxialPos { q: 15, r: 15 },
-            ))
+            .insert_resource(CurrentRoom(AxialPos { q: 15, r: 15 }))
+            .insert_resource(RoomOffsets(LruCache::new(16)))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }
 }

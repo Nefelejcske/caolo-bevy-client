@@ -95,7 +95,7 @@ fn handle_mining(
 ) {
     for event in events.iter() {
         if let Some(bot_tr) = q.get(event.bot_id).ok() {
-            debug!("Spawning mining icon at {:?}", bot_tr.translation);
+            trace!("Spawning mining icon at {:?}", bot_tr.translation);
             spawn_icon(&mut cmd, &*assets, bot_tr.translation);
         }
     }

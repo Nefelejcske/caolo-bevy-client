@@ -1,8 +1,7 @@
 pub mod resource_assets;
 
-use std::collections::HashMap;
-
 use bevy::{
+    ecs::system::EntityCommands,
     prelude::*,
     render::{
         pipeline::{PipelineDescriptor, RenderPipeline},
@@ -10,20 +9,14 @@ use bevy::{
     },
 };
 
-use crate::{
-    bots::pos_2d_to_3d,
-    cao_sim_client::{hex_axial_to_pixel, NewEntities, SimEntityId},
-};
-
-#[derive(Default)]
-pub struct ResourceIdMap(pub HashMap<SimEntityId, Entity>);
+use crate::cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent};
 
 pub struct Resource;
 
 pub struct ResourcesPlugin;
 
-fn spawn_resource(
-    cmd: &mut Commands,
+fn build_resource(
+    cmd: &mut EntityCommands,
     pos: Vec2,
     assets: &resource_assets::ResourceRenderingAssets,
     materials: &mut Assets<resource_assets::ResourceMaterial>,
@@ -33,7 +26,7 @@ fn spawn_resource(
         time: 0.0,
     });
 
-    cmd.spawn_bundle((
+    cmd.insert_bundle((
         Resource,
         Transform::from_translation(pos_2d_to_3d(pos)),
         GlobalTransform::default(),
@@ -65,47 +58,22 @@ fn update_res_materials(
 
 fn on_new_entities(
     mut cmd: Commands,
-    mut entity_map: ResMut<ResourceIdMap>,
     assets: Res<resource_assets::ResourceRenderingAssets>,
     mut materials: ResMut<Assets<resource_assets::ResourceMaterial>>,
-    mut new_entities: EventReader<NewEntities>,
-    mut res_q: Query<&mut Transform, With<Resource>>,
+    mut new_entities: EventReader<NewEntityEvent>,
+    q_meta: Query<&EntityMetadata>,
 ) {
-    for new_entities in new_entities.iter() {
-        let len = entity_map.0.len();
-        let mut prev = std::mem::replace(&mut entity_map.0, HashMap::with_capacity(len));
-        let curr = &mut entity_map.0;
-        curr.clear();
-        for res in new_entities.0.resources.iter() {
-            let cao_id = SimEntityId(res.id);
-            if let Some(res_id) = prev.remove(&cao_id) {
-                trace!("found entity {:?}", res.id);
-                curr.insert(cao_id, res_id);
-                let mut tr = res_q
-                    .get_mut(res_id)
-                    .expect("Failed to query existing resource transform");
-                // when resources respawn they usually aren't destroyed, just re-transformed
-                let pos = &res.pos;
-                let pos = hex_axial_to_pixel(pos.q as f32, pos.r as f32);
-                tr.translation = pos_2d_to_3d(pos);
-            } else {
-                let pos = &res.pos;
-                let new_id = spawn_resource(
-                    &mut cmd,
-                    hex_axial_to_pixel(pos.q as f32, pos.r as f32),
-                    &*assets,
-                    &mut *materials,
-                );
-
-                curr.insert(cao_id, new_id);
-                trace!("new entity {:?}", res.id);
-            }
-        }
-        // these entities were not sent in the current tick
-        for (_, dead_entity) in prev {
-            trace!("Entity {:?} died", dead_entity);
-            cmd.entity(dead_entity).despawn_recursive();
-        }
+    for new_entity_event in new_entities
+        .iter()
+        .filter(|e| e.ty == crate::cao_entities::EntityType::Resource)
+    {
+        let meta = q_meta.get(new_entity_event.id).unwrap();
+        build_resource(
+            &mut cmd.entity(meta.id),
+            meta.pos.as_pixel(),
+            &*assets,
+            &mut *materials,
+        );
     }
 }
 
@@ -153,7 +121,6 @@ impl Plugin for ResourcesPlugin {
                     .with_system(update_res_materials.system()),
             )
             .add_asset::<resource_assets::ResourceMaterial>()
-            .init_resource::<resource_assets::ResourceRenderingAssets>()
-            .init_resource::<ResourceIdMap>();
+            .init_resource::<resource_assets::ResourceRenderingAssets>();
     }
 }

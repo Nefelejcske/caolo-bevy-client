@@ -1,5 +1,3 @@
-use crate::{AppState, EntityType};
-use arrayvec::ArrayVec;
 use bevy::{
     ecs::schedule::ShouldRun,
     prelude::*,
@@ -7,46 +5,45 @@ use bevy::{
 };
 
 use crate::{
-    camera_control::RoomCameraTag,
-    cao_sim_client::{cao_sim_model::AxialPos, SimEntityId},
+    camera_control::RoomCameraTag, cao_sim_client::cao_sim_model::AxialPos, terrain::RoomOffsets,
+    AppState,
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct EguiInteraction(pub bool);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct SelectedEntity {
-    pub entity: Option<(SimEntityId, Entity)>,
-    pub ty: EntityType,
+    pub entity: Option<Entity>,
 }
 
-impl Default for SelectedEntity {
-    fn default() -> Self {
-        Self {
-            entity: None,
-            ty: EntityType::Undefined,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct EntitySelection {
     pub click_id: u32,
-    pub axial: AxialPos,
+    /// absolute position
+    pub pos: AxialPos,
 }
 
 impl Default for EntitySelection {
     fn default() -> Self {
         EntitySelection {
             click_id: 0,
-            axial: AxialPos::default(),
+            pos: Default::default(),
         }
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct HoveredTile {
+    /// in world coordinate system
     pub axial: AxialPos,
+    pub world_pos: Vec3,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct LookAtRoom {
+    /// in world coordinate system
+    pub id: AxialPos,
     pub world_pos: Vec3,
 }
 
@@ -55,34 +52,26 @@ fn select_tile_system(
     keys: Res<Input<MouseButton>>,
     mut selection: ResMut<EntitySelection>,
     mut selected: ResMut<SelectedEntity>,
-    bots: Res<crate::bots::EntityPositionMap>,
-    structures: Res<crate::structures::EntityPositionMap>,
-    // TODO: structures
+    entities: Res<crate::cao_entities::EntityPositionMap>,
 ) {
     if keys
         .get_just_pressed()
         .any(|k| matches!(k, MouseButton::Left))
     {
-        let is_new_tile = tile.axial != selection.axial;
+        let is_new_tile = tile.axial != selection.pos;
         if is_new_tile {
             selection.click_id = 0;
         } else {
             selection.click_id += 1
         }
-        selection.axial = tile.axial;
+        selection.pos = tile.axial;
         selected.entity = None;
-        let mut all: ArrayVec<_, 3> = ArrayVec::new();
-        if let Some(ids) = bots.0.get(&selection.axial).copied() {
-            all.push((ids, EntityType::Bot));
-        }
-        if let Some(ids) = structures.0.get(&selection.axial).copied() {
-            all.push((ids, EntityType::Structure));
-        }
-        // TODO: resources
-        selected.entity = (!all.is_empty()).then(|| {
-            let ind = selection.click_id as usize % all.len();
-            selected.ty = all[ind].1;
-            all[ind].0
+        let entity_ids = entities.0.get(&selection.pos);
+        selected.entity = entity_ids.and_then(|all| {
+            (!all.is_empty()).then(|| {
+                let ind = selection.click_id as usize % all.len();
+                all[ind]
+            })
         });
     }
 }
@@ -107,16 +96,83 @@ fn window_to_world(
 
 /// intersect a given AB line with the plane of the terrain.
 /// Assumes that the line always intersects the plane...
+fn intersect_line_terrain_plain(a: Vec3, b: Vec3) -> Vec3 {
+    intersect_ray_terrain_plain(a, b - a)
+}
+
+/// intersect a given ray with the plane of the terrain.
+/// Assumes that the ray always intersects the plane...
 ///
 /// - `n=<0, 1, 0>`
 /// - `d=-1`
-fn intersect_line_terrain_plain(a: Vec3, b: Vec3) -> Vec3 {
-    let ab = b - a;
-
+fn intersect_ray_terrain_plain(a: Vec3, dir: Vec3) -> Vec3 {
     let n = Vec3::Y;
-    let t = (-1.0 - n.dot(a)) / n.dot(ab);
+    let t = (-1.0 - n.dot(a)) / n.dot(dir);
 
-    a + t * ab
+    a + t * dir
+}
+
+fn update_lookat_room_system(
+    mut room: ResMut<LookAtRoom>,
+    q_cam: Query<&GlobalTransform, With<RoomCameraTag>>,
+    current: Res<crate::terrain::CurrentRoom>,
+    mut new_current_room: EventWriter<crate::terrain::NewCurrentRoom>,
+    mut offsets: ResMut<RoomOffsets>,
+) {
+    for cam_tr in q_cam.iter() {
+        let point_q = intersect_ray_terrain_plain(cam_tr.translation, cam_tr.local_z());
+
+        // hex size = 1
+        let q = 3.0f32.sqrt() / 3.0 * point_q.x - point_q.z / 3.;
+        let r = 2. * point_q.z / 3.;
+
+        let axial_on_plane = cao_math::hex::round_to_nearest_axial(q, r);
+
+        let axial = AxialPos {
+            q: axial_on_plane.x as i32,
+            r: axial_on_plane.y as i32,
+        };
+
+        const RADIUS: i32 = 30; // TODO query this pls...
+
+        let offset = match offsets.0.get(&current.0) {
+            Some(x) => x,
+            None => continue,
+        };
+        let center = AxialPos {
+            q: offset.q + RADIUS,
+            r: offset.r + RADIUS,
+        };
+        let delta = AxialPos {
+            q: (center.q - axial.q).abs(),
+            r: (center.r - axial.r).abs(),
+        };
+        // add bias to the current room so we don't trigger switch if the player moves the camera
+        // back-and-forth
+        if delta.q * delta.q + delta.r * delta.r >= (RADIUS * 3 / 2).pow(2) {
+            // out of current room
+            if let Some((room_id, _, _)) = offsets
+                .0
+                .iter()
+                .map(|(id, offset)| {
+                    // distance from center
+                    let dq = axial.q - (offset.q + RADIUS);
+                    let dr = axial.r - (offset.r + RADIUS);
+
+                    // filter out negative distances, these are out of bounds
+                    (id, offset, AxialPos { q: dq, r: dr })
+                })
+                .min_by_key(|(_id, _offset, delta)| delta.q * delta.q + delta.r * delta.r)
+            {
+                let room_id = *room_id;
+                room.id = room_id;
+                room.world_pos = point_q;
+                if room_id != current.0 {
+                    new_current_room.send(crate::terrain::NewCurrentRoom(room_id));
+                }
+            }
+        }
+    }
 }
 
 fn update_selected_tile_system(
@@ -140,11 +196,11 @@ fn update_selected_tile_system(
             let q = 3.0f32.sqrt() / 3.0 * point_q.x - point_q.z / 3.;
             let r = 2. * point_q.z / 3.;
 
-            let res = cao_math::hex::round_to_nearest_axial(q, r);
+            let axial_on_plane = cao_math::hex::round_to_nearest_axial(q, r);
 
             let axial = AxialPos {
-                q: res.x as i32,
-                r: res.y as i32,
+                q: axial_on_plane.x as i32,
+                r: axial_on_plane.y as i32,
             };
 
             st.axial = axial;
@@ -176,6 +232,7 @@ pub struct RoomInteractionPlugin;
 impl Plugin for RoomInteractionPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.insert_resource(HoveredTile::default())
+            .insert_resource(LookAtRoom::default())
             .insert_resource(EntitySelection::default())
             .insert_resource(SelectedEntity::default())
             .insert_resource(EguiInteraction(false))
@@ -184,6 +241,7 @@ impl Plugin for RoomInteractionPlugin {
                 SystemSet::new()
                     .with_run_criteria(should_room_systems_run.system())
                     .with_system(update_selected_tile_system.system())
+                    .with_system(update_lookat_room_system.system())
                     .with_system(select_tile_system.system()),
             );
     }

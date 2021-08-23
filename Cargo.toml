@@ -13,8 +13,7 @@ cao-math = { git = "https://github.com/caolo-game/cao-math.git" }
 surf = { version = "2" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing = { version = "0.1", features = ["release_max_level_warn"] }
 crossbeam = "*"
 tokio = { version = "1", features = ["sync", "rt-multi-thread", "time"] }
 async-tungstenite = { version = "0.13", features = [
@@ -25,9 +24,10 @@ tungstenite = { version = "0.13" }
 futures = "0.3"
 futures-lite = "1"
 fastrand = "1.4"
-atomic_enum = "0.1"
-arrayvec = "0.7"
 thiserror = "1"
+anyhow = "1"
+smallvec = "1"
+lru = "0.6"
 
 # Enable optimizations for dependencies (incl. Bevy), but not for our code:
 [profile.dev.package."*"]

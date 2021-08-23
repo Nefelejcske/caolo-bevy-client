@@ -290,18 +290,15 @@ fn editor_ui_system(
         }
     }
     if dropped {
-        if let Some((src_lane, src_card)) = src_col_row {
-            match dst_col_row {
-                Some((dst_lane, dst_card)) => {
-                    on_drop.send(OnCardDrop {
-                        src_lane,
-                        dst_lane,
-                        src_card,
-                        dst_card,
-                    });
-                }
-                None => { /* noop */ }
-            }
+        if let Some(((src_lane, src_card), (dst_lane, dst_card))) =
+            src_col_row.into_iter().zip(dst_col_row.into_iter()).next()
+        {
+            on_drop.send(OnCardDrop {
+                src_lane,
+                dst_lane,
+                src_card,
+                dst_card,
+            });
         }
     }
     if let Some(i) = closed_lane_idx {
@@ -315,7 +312,7 @@ impl Plugin for CaoLangEditorPlugin {
             .insert_resource(LaneNames(Vec::with_capacity(4)))
             .insert_resource(CurrentCompileError(None))
             .insert_resource(CurrentProgram(CaoIr {
-                lanes: Vec::with_capacity(4),
+                lanes: vec![cao_lang::compiler::Lane::default().with_name("Main")],
             }))
             .add_system_set(
                 SystemSet::on_update(crate::AppState::CaoLangEditor)

@@ -1,3 +1,5 @@
+use super::hex_axial_to_pixel;
+
 #[derive(serde::Serialize)]
 pub struct GetLayoutQuery {
     pub radius: i32,
@@ -14,7 +16,8 @@ pub enum Message {
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerrainPayload {
-    pub room_id: RoomId,
+    pub room_id: AxialPos,
+    pub offset: AxialPos,
     pub tiles: Vec<i64>,
 }
 
@@ -28,13 +31,6 @@ pub enum TerrainTy {
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RoomId {
-    pub q: i64,
-    pub r: i64,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct EntitiesPayload {
     pub time: i64,
@@ -42,6 +38,15 @@ pub struct EntitiesPayload {
     pub bots: Vec<Bot>,
     pub structures: Vec<Structure>,
     pub resources: Vec<Resource>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Eq, Hash)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldPosition {
+    pub room: AxialPos,
+    pub pos: AxialPos,
+    pub offset: AxialPos,
 }
 
 #[derive(
@@ -59,7 +64,7 @@ pub struct AxialPos {
 #[serde(rename_all = "camelCase")]
 pub struct Bot {
     pub id: i64,
-    pub pos: AxialPos,
+    pub pos: WorldPosition,
     pub carry: Option<Carry>,
     pub hp: Option<Hp>,
     pub script: Option<Script>,
@@ -127,7 +132,7 @@ pub struct Decay {
 #[serde(default)]
 pub struct Structure {
     pub id: i64,
-    pub pos: AxialPos,
+    pub pos: WorldPosition,
     pub hp: Hp,
     pub energy: Energy,
     pub energy_regen: i64,
@@ -166,7 +171,7 @@ pub struct Spawn {
 #[serde(default)]
 pub struct Resource {
     pub id: i64,
-    pub pos: AxialPos,
+    pub pos: WorldPosition,
     #[serde(rename = "ResourceType")]
     pub resource_type: ResourceType,
 }
@@ -177,4 +182,19 @@ pub struct Resource {
 pub struct ResourceType {
     #[serde(rename = "Energy")]
     pub energy: Energy,
+}
+
+impl WorldPosition {
+    pub fn as_pixel(&self) -> bevy::math::Vec2 {
+        let q = self.pos.q + self.offset.q;
+        let r = self.pos.r + self.offset.r;
+        hex_axial_to_pixel(q as f32, r as f32)
+    }
+
+    pub fn absolute_axial(&self) -> AxialPos {
+        AxialPos {
+            q: self.pos.q + self.offset.q,
+            r: self.pos.r + self.offset.r,
+        }
+    }
 }

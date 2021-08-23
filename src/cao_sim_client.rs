@@ -5,6 +5,7 @@ pub mod cao_client;
 pub mod cao_sim_model;
 pub mod terrain_model;
 
+use anyhow::Context;
 use bevy::{
     prelude::*,
     tasks::{IoTaskPool, Task},
@@ -23,13 +24,14 @@ use std::{
 
 use self::{
     cao_client::CaoClient,
-    cao_sim_model::{AxialPos, RoomId, TerrainTy},
+    cao_sim_model::{AxialPos, TerrainTy},
 };
 
 pub struct CaoSimPlugin;
 pub struct NewEntities(pub Arc<cao_sim_model::EntitiesPayload>);
 pub struct NewTerrain {
-    pub room_id: RoomId,
+    pub room_id: AxialPos,
+    pub offset: AxialPos,
     pub terrain: Arc<Vec<(AxialPos, TerrainTy)>>,
 }
 pub struct Connected;
@@ -99,6 +101,122 @@ fn send_connected_event_system(recv: Res<ConnectedRcv>, mut on_reconnect: EventW
     }
 }
 
+fn handle_message(
+    txt: &str,
+    terrain_sender: &crossbeam::channel::Sender<NewTerrain>,
+    entities_sender: &crossbeam::channel::Sender<NewEntities>,
+    layout: &[AxialPos],
+) -> anyhow::Result<()> {
+    trace!("Incoming message");
+    let msg = serde_json::from_str::<cao_sim_model::Message>(txt)
+        .with_context(|| "Failed to deserialize msg")?;
+    match msg {
+        cao_sim_model::Message::Terrain(Some(terrain)) => {
+            info!(
+                "Got terrain for room: {:?}, offset: {:?}",
+                terrain.room_id, terrain.offset
+            );
+            let pl = terrain_model::terrain_payload_to_components(terrain.tiles.as_slice(), layout)
+                .collect();
+
+            terrain_sender
+                .send(NewTerrain {
+                    room_id: terrain.room_id,
+                    offset: terrain.offset,
+                    terrain: Arc::new(pl),
+                })
+                .with_context(|| "Failed to send new terrain")?;
+        }
+        cao_sim_model::Message::Terrain(None) => {
+            info!("Terrain request returned null");
+        }
+        cao_sim_model::Message::Entities(ent) => {
+            trace!("New entities, time: {}, room: {:?}", ent.time, ent.room_id);
+            entities_sender
+                .send(NewEntities(Arc::new(ent)))
+                .with_context(|| "Failed to send new entities")?;
+        }
+    }
+    Ok(())
+}
+
+async fn listen_to_cao_rt(
+    layout: Vec<AxialPos>,
+    state: ConnectionStateRes,
+    runtime: Arc<tokio::runtime::Runtime>,
+    msg_recv: crossbeam::channel::Receiver<tungstenite::Message>,
+    msg_send: crossbeam::channel::Sender<tungstenite::Message>,
+    entities_sender: crossbeam::channel::Sender<NewEntities>,
+    terrain_sender: crossbeam::channel::Sender<NewTerrain>,
+    reconnect_sender: crossbeam::channel::Sender<Connected>,
+) {
+    let mut backoff = 1;
+    loop {
+        info!("Connecting to caosim stream");
+
+        state.store(ConnectionState::Connecting, Ordering::Release);
+
+        let ws_stream;
+        match get_connection().await {
+            Ok(s) => {
+                backoff = 1;
+                ws_stream = s;
+            }
+            Err(_) => {
+                debug!("Retrying");
+                state.store(ConnectionState::Error, Ordering::Release);
+
+                tokio::time::sleep(Duration::from_millis(backoff)).await;
+                backoff = (backoff << 1).max(4096);
+
+                continue;
+            }
+        }
+        let (tx, mut rx) = ws_stream.split();
+
+        // spawn the new sender task before notifying clients of the reconnect
+        let msg_sender = runtime.spawn(msg_sender(msg_recv.clone(), tx));
+        tokio::task::yield_now().await;
+
+        info!("Successfully connected to caosim stream");
+        state.store(ConnectionState::Online, Ordering::Release);
+        reconnect_sender.send(Connected).unwrap();
+
+        let entities_sender = entities_sender.clone();
+        let terrain_sender = terrain_sender.clone();
+        while let Some(msg) = rx.next().await {
+            match msg {
+                Ok(tungstenite::Message::Text(txt)) => {
+                    if let Err(err) = handle_message(
+                        txt.as_str(),
+                        &terrain_sender,
+                        &entities_sender,
+                        layout.as_slice(),
+                    ) {
+                        error!("Failed to handle message {:?}", err);
+                    }
+                }
+                Ok(tungstenite::Message::Pong(_)) => {
+                    trace!("Server pong received")
+                }
+                Ok(tungstenite::Message::Ping(_)) => {
+                    msg_send
+                        .send(tungstenite::Message::Pong(vec![]))
+                        .unwrap_or_default();
+                }
+                Ok(msg) => {
+                    debug!("Unexpected message variant {:?}", msg);
+                }
+                Err(err) => {
+                    info!("Connection dropped ({}), reconnecting", err);
+                }
+            }
+        }
+        state.store(ConnectionState::Closed, Ordering::Release);
+        msg_sender.abort(); // abort this future, otherwise we might send events to it that it can not handle in the future
+    }
+}
+
 fn handle_tasks_system(
     mut commands: Commands,
     mut layout: ResMut<TerrainLayout>,
@@ -112,104 +230,16 @@ fn handle_tasks_system(
             *layout = stuff;
             commands.entity(e).remove::<Task<TerrainLayout>>();
 
-            let msg_send = client.send_message.0.clone();
-            let msg_recv = client.send_message.1.clone();
-            let entities_sender = client.on_new_entities.0.clone();
-            let terrain_sender = client.on_new_terrain.0.clone();
-            let reconnect_sender = client.on_connected.0.clone();
-
-            let state: ConnectionStateRes = state.clone();
-            let runtime = client.runtime.clone();
-            let layout = layout.0.clone();
-            client.runtime.spawn(async move {
-                let mut backoff = 1;
-                loop {
-                    info!("Connecting to caosim stream");
-
-                    state.store(ConnectionState::Connecting, Ordering::Release);
-
-                    let ws_stream;
-                    match get_connection().await {
-                        Ok(s) => {
-                            backoff = 1;
-                            ws_stream = s;
-                        }
-                        Err(_) => {
-                            debug!("Retrying");
-                            state.store(ConnectionState::Error, Ordering::Release);
-
-                            tokio::time::sleep(Duration::from_millis(backoff)).await;
-                            backoff = (backoff << 1).max(4096);
-
-                            continue;
-                        }
-                    }
-                    let (tx, mut rx) = ws_stream.split();
-
-                    // spawn the new sender task before notifying clients of the reconnect
-                    let msg_sender = runtime.spawn(msg_sender(msg_recv.clone(), tx));
-                    tokio::task::yield_now().await;
-
-                    info!("Successfully connected to caosim stream");
-                    state.store(ConnectionState::Online, Ordering::Release);
-                    reconnect_sender.send(Connected).unwrap();
-
-                    let entities_sender = entities_sender.clone();
-                    let terrain_sender = terrain_sender.clone();
-                    while let Some(msg) = rx.next().await {
-                        match msg {
-                            Ok(tungstenite::Message::Text(txt)) => {
-                                debug!("Incoming message");
-                                let msg =
-                                    serde_json::from_str::<cao_sim_model::Message>(txt.as_str())
-                                        .expect("Failed to deserialize msg");
-                                match msg {
-                                    cao_sim_model::Message::Terrain(Some(terrain)) => {
-                                        info!("Got terrain");
-                                        let pl = terrain_model::terrain_payload_to_components(
-                                            terrain.tiles.as_slice(),
-                                            layout.as_slice(),
-                                        )
-                                        .collect();
-
-                                        terrain_sender
-                                            .send(NewTerrain {
-                                                room_id: terrain.room_id,
-                                                terrain: Arc::new(pl),
-                                            })
-                                            .expect("Failed to send new terrain");
-                                    }
-                                    cao_sim_model::Message::Terrain(None) => {
-                                        info!("Terrain request returned null");
-                                    }
-                                    cao_sim_model::Message::Entities(ent) => {
-                                        debug!("New entities, time: {}", ent.time);
-                                        entities_sender
-                                            .send(NewEntities(Arc::new(ent)))
-                                            .expect("Failed to send new entities");
-                                    }
-                                }
-                            }
-                            Ok(tungstenite::Message::Pong(_)) => {
-                                trace!("Server pong received")
-                            }
-                            Ok(tungstenite::Message::Ping(_)) => {
-                                msg_send
-                                    .send(tungstenite::Message::Pong(vec![]))
-                                    .unwrap_or_default();
-                            }
-                            Ok(msg) => {
-                                debug!("Unexpected message variant {:?}", msg);
-                            }
-                            Err(err) => {
-                                info!("Connection dropped ({}), reconnecting", err);
-                            }
-                        }
-                    }
-                    state.store(ConnectionState::Closed, Ordering::Release);
-                    msg_sender.abort(); // abort this future, otherwise we might send events to it that it can not handle in the future
-                }
-            });
+            client.runtime.spawn(listen_to_cao_rt(
+                layout.0.clone(),
+                state.clone(),
+                client.runtime.clone(),
+                client.send_message.1.clone(),
+                client.send_message.0.clone(),
+                client.on_new_entities.0.clone(),
+                client.on_new_terrain.0.clone(),
+                client.on_connected.0.clone(),
+            ));
         }
     });
 }

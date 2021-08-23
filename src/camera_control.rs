@@ -34,7 +34,7 @@ fn inner_camera_input_system(
             let forward = tr.local_z();
             let pos = tr.translation + (forward * -event.y * vel.0 * time.delta_seconds());
             // zoom bounds
-            if 5.0 <= pos.y && pos.y <= 100. {
+            if 5.0 <= pos.y && pos.y <= 200. {
                 tr.translation = pos;
             }
         }
@@ -100,7 +100,9 @@ fn rig_input_system(
 }
 
 fn setup(mut cmd: Commands) {
-    let map_mid = cao_sim_client::hex_axial_to_pixel(30., 30.);
+    // TODO:
+    // maybe get from an event?
+    let map_mid = cao_sim_client::hex_axial_to_pixel(217., 1147.);
     let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
 
     let outertr = Transform::from_translation(Vec3::new(map_mid.x, 0., map_mid.z));
@@ -113,7 +115,7 @@ fn setup(mut cmd: Commands) {
 
     cmd.spawn()
         .insert_bundle((
-            Velocity(50.0),
+            Velocity(150.0),
             RoomCameraRigTag,
             outertr,
             GlobalTransform::default(),
@@ -124,7 +126,7 @@ fn setup(mut cmd: Commands) {
             c.spawn()
                 .insert_bundle(PerspectiveCameraBundle::new_3d())
                 .insert(innertr)
-                .insert(Velocity(150.0))
+                .insert(Velocity(200.0))
                 .insert(RoomCameraTag);
         });
 }
