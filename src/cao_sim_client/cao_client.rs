@@ -57,6 +57,15 @@ impl CaoClient {
         self.send_message(tungstenite::Message::Binary(payload));
     }
 
+    pub fn send_subscribe_multi_room(&self, rooms: &[AxialPos]) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "room_ids",
+            "room_ids": rooms
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
     /// unsubscribes from given room updates
     pub fn send_unsubscribe_room(&self, room: AxialPos) {
         let payload = serde_json::to_vec(&serde_json::json!({

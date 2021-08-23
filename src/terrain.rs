@@ -329,7 +329,7 @@ fn setup(
     };
 }
 
-pub fn room_neighbours(axial: AxialPos) -> impl IntoIterator<Item = AxialPos> {
+pub fn room_neighbours(axial: AxialPos) -> [AxialPos; 6] {
     let q = axial.q;
     let r = axial.r;
 
@@ -353,9 +353,7 @@ fn update_current_room_system(
         current_room.0 = room.0;
         client.send_unsubscribe_all();
         client.send_subscribe_room(current_room.0);
-        for neighbour in room_neighbours(current_room.0) {
-            client.send_subscribe_room(neighbour);
-        }
+        client.send_subscribe_multi_room(&room_neighbours(current_room.0));
     }
 }
 
