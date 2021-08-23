@@ -91,7 +91,7 @@ fn on_resource_move_system(
         let (_res, meta, mut tr) = match res_data.get_mut(event.id) {
             Ok(b) => b,
             Err(err) => {
-                error!(
+                warn!(
                     "Received resource moved event but the entity can't be queried {:?}",
                     err
                 );
@@ -140,10 +140,10 @@ fn setup(
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup.system())
-            .add_system(on_new_entities.system())
-            .add_system(on_resource_move_system.system())
             .add_system_set(
                 SystemSet::on_update(crate::AppState::Room)
+                    .with_system(on_new_entities.system())
+                    .with_system(on_resource_move_system.system())
                     .with_system(update_res_materials.system()),
             )
             .add_asset::<resource_assets::ResourceMaterial>()
