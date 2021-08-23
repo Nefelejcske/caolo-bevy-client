@@ -57,18 +57,12 @@ fn entity_gc_system(
     mut cmd: Commands,
     ts: Res<LatestTime>,
     q: Query<(Entity, &SimEntityId, &EntityMetadata)>,
-    mut positions_map: ResMut<EntityPositionMap>,
 ) {
     let latest_timestamp = ts.0;
     for (e, se, meta) in q.iter() {
         if (latest_timestamp - meta.ts) >= 2 {
             trace!("Deleting dead entity {:?}", se);
             cmd.entity(e).despawn_recursive();
-            if let Some(poss) = positions_map.0.get_mut(&meta.pos.absolute_axial()) {
-                if let Some((idx, _)) = poss.iter().enumerate().find(|(_, id)| id == &&e) {
-                    poss.swap_remove(idx);
-                }
-            }
         }
     }
 }
@@ -79,7 +73,6 @@ fn handle_new_entity<'a, 'b>(
     cao_id: SimEntityId,
     ty: EntityType,
     wp: WorldPosition,
-    positions_map: &mut EntityPositionMap,
     moved_event: &mut EventWriter<EntityMovedEvent>,
     spawned_event: &mut EventWriter<NewEntityEvent>,
     meta_map: &mut Query<&mut EntityMetadata>,
@@ -99,11 +92,6 @@ fn handle_new_entity<'a, 'b>(
         trace!("found entity {:?}", metadata.cao_id);
 
         if metadata.pos != wp {
-            if let Some(ids) = positions_map.0.get_mut(&metadata.pos.absolute_axial()) {
-                if let Some((idx, _)) = ids.iter().enumerate().find(|(_, id)| id == &&metadata.id) {
-                    ids.swap_remove(idx);
-                }
-            }
             moved_event.send(EntityMovedEvent {
                 id: entity_id,
                 cao_id,
@@ -143,18 +131,26 @@ fn handle_new_entity<'a, 'b>(
         });
         cmd
     };
-    positions_map
-        .0
-        .entry(wp.absolute_axial())
-        .or_default()
-        .push(entity_id);
     cmd
+}
+
+fn update_positions_system(
+    mut positions_map: ResMut<EntityPositionMap>,
+    q: Query<(Entity, &EntityMetadata)>,
+) {
+    positions_map.0.clear();
+    for (e, m) in q.iter() {
+        positions_map
+            .0
+            .entry(m.pos.absolute_axial())
+            .or_default()
+            .push(e);
+    }
 }
 
 fn on_new_entities_system(
     mut cmd: Commands,
     mut new_entities: EventReader<crate::cao_sim_client::NewEntities>,
-    mut positions_map: ResMut<EntityPositionMap>,
     mut moved_event: EventWriter<EntityMovedEvent>,
     mut spawned_event: EventWriter<NewEntityEvent>,
     mut latest_ts: ResMut<LatestTime>,
@@ -178,7 +174,6 @@ fn on_new_entities_system(
                 cao_id,
                 EntityType::Structure,
                 structure.pos.clone(),
-                &mut *positions_map,
                 moved_event,
                 spawned_event,
                 &mut meta_map,
@@ -194,7 +189,6 @@ fn on_new_entities_system(
                 cao_id,
                 EntityType::Resource,
                 resource.pos.clone(),
-                &mut *positions_map,
                 moved_event,
                 spawned_event,
                 &mut meta_map,
@@ -210,7 +204,6 @@ fn on_new_entities_system(
                 cao_id,
                 EntityType::Bot,
                 bot.pos.clone(),
-                &mut *positions_map,
                 moved_event,
                 spawned_event,
                 &mut meta_map,
@@ -230,6 +223,7 @@ impl Plugin for CaoEntityPlugin {
             .insert_resource(LatestTime(-1))
             .add_event::<NewEntityEvent>()
             .add_event::<EntityMovedEvent>()
+            .add_system(update_positions_system.system())
             .add_stage_before(
                 CoreStage::PreUpdate,
                 "remote_input",
