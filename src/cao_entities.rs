@@ -6,10 +6,11 @@ use crate::cao_sim_client::{
     cao_sim_model::{AxialPos, WorldPosition},
     SimEntityId,
 };
+use lru::LruCache;
 
 /// maps absolute coordinates to entity ids
 pub struct EntityPositionMap(pub HashMap<AxialPos, smallvec::SmallVec<[Entity; 4]>>);
-pub struct SimToBevyId(pub HashMap<SimEntityId, Entity>);
+pub struct SimToBevyId(pub LruCache<SimEntityId, Entity>);
 /// Latest time sent by the entities payload
 pub struct LatestTime(pub i64);
 
@@ -55,12 +56,11 @@ pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
 // TODO: once entity death events  are available use those + check the visible rooms maybe
 fn entity_gc_system(
     mut cmd: Commands,
-    ts: Res<LatestTime>,
-    q: Query<(Entity, &SimEntityId, &EntityMetadata)>,
+    sim2bevy: Res<SimToBevyId>,
+    q: Query<(Entity, &SimEntityId)>,
 ) {
-    let latest_timestamp = ts.0;
-    for (e, se, meta) in q.iter() {
-        if (latest_timestamp - meta.ts) >= 5 {
+    for (e, se) in q.iter() {
+        if !sim2bevy.0.contains(se) {
             trace!("Deleting dead entity {:?}", se);
             cmd.entity(e).despawn_recursive();
         }
@@ -79,9 +79,9 @@ fn handle_new_entity<'a, 'b>(
     sim2bevy: &mut SimToBevyId,
 ) -> EntityCommands<'a, 'b> {
     let entity_id;
-    let cmd = if let Some((id, mut metadata)) = sim2bevy
+    if let Some((id, mut metadata)) = sim2bevy
         .0
-        .get(&cao_id)
+        .get(&cao_id) // moves this entity to the top of the LRU
         .and_then(|id| meta_map.get_mut(*id).ok().map(|x| (id, x)))
         // if the simulation recycled this ID, we treat it as a new entity
         .and_then(|(id, m)| (m.ty == ty).then(|| (id, m)))
@@ -103,6 +103,8 @@ fn handle_new_entity<'a, 'b>(
 
         cmd.entity(metadata.id)
     } else {
+        // spawn new entity
+        //
         let mut cmd = cmd.spawn();
         cmd.insert(cao_id).insert(ty);
         entity_id = cmd.id();
@@ -118,7 +120,7 @@ fn handle_new_entity<'a, 'b>(
         trace!("new entity {:?}", meta);
         cmd.insert(meta);
 
-        sim2bevy.0.insert(cao_id, entity_id);
+        sim2bevy.0.put(cao_id, entity_id);
         moved_event.send(EntityMovedEvent {
             id: entity_id,
             cao_id,
@@ -130,8 +132,7 @@ fn handle_new_entity<'a, 'b>(
             ty,
         });
         cmd
-    };
-    cmd
+    }
 }
 
 fn update_positions_system(
@@ -219,7 +220,7 @@ pub struct CaoEntityPlugin;
 impl Plugin for CaoEntityPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.insert_resource(EntityPositionMap(HashMap::with_capacity(2048)))
-            .insert_resource(SimToBevyId(HashMap::with_capacity(2048)))
+            .insert_resource(SimToBevyId(LruCache::new(4096)))
             .insert_resource(LatestTime(-1))
             .add_event::<NewEntityEvent>()
             .add_event::<EntityMovedEvent>()
