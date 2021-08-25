@@ -151,6 +151,13 @@ fn on_reconnect_system(
     }
 }
 
+fn is_room_visible(current: &CurrentRoom, room_id: &Room) -> bool {
+    let dq = current.0.q - room_id.0.q;
+    let dr = current.0.r - room_id.0.r;
+
+    dq.abs() <= 1 && dr.abs() <= 1 && (dq + dr).abs() <= 1
+}
+
 fn update_terrain_material_system(
     selected_tile: Res<HoveredTile>,
     current_room: Res<CurrentRoom>,
@@ -160,11 +167,7 @@ fn update_terrain_material_system(
     for (room_id, room_mat) in rooms.iter() {
         if let Some(mat) = materials.get_mut(room_mat) {
             mat.cursor_pos = selected_tile.world_pos;
-
-            let dq = current_room.0.q - room_id.0.q;
-            let dr = current_room.0.r - room_id.0.r;
-
-            mat.is_visible = (dq.abs() <= 1 && dr.abs() <= 1 && (dq + dr).abs() <= 1) as i32;
+            mat.is_visible = is_room_visible(&*current_room, &*room_id) as i32;
         }
     }
 }
