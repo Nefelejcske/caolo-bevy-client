@@ -1,5 +1,5 @@
 use crate::{
-    cao_sim_client::{ConnectionStateRes, NewEntities, NewTerrain},
+    cao_sim_client::{ConnectionStateRes, NewEntities},
     room_interaction::{HoveredTile, LookAtRoom, SelectedEntity},
     terrain::CurrentRoom,
 };
@@ -29,7 +29,7 @@ fn update_ui_system(
     egui::Window::new("Room diagnostics").show(egui_ctx.ctx(), |ui| {
         ui.label(format!("Tick: {}", data.time));
         ui.label(format!("Connection state: {:?}", connection_state));
-        ui.label(format!("Current room: {:?}", current_room.0));
+        ui.label(format!("Current room: {:?}", current_room.room_id));
         ui.label(format!("Hovered tile: {:?}", hovered.axial));
         ui.label(format!("Look at room: {:?}", lat_room.id));
     });

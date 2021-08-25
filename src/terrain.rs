@@ -24,7 +24,12 @@ use crate::{
 use lru::LruCache;
 
 pub struct TerrainPlugin;
-pub struct CurrentRoom(pub AxialPos);
+
+#[derive(Debug, Clone, Copy)]
+pub struct CurrentRoom {
+    pub room_id: AxialPos,
+    pub visible_range: u32,
+}
 pub struct NewCurrentRoom(pub AxialPos);
 
 pub struct Room(pub AxialPos);
@@ -147,15 +152,16 @@ fn on_reconnect_system(
 ) {
     if on_reconnect.iter().next().is_some() {
         info!("Reconnect event received, sending current room");
-        new_rooms.send(NewCurrentRoom(current_room.0));
+        new_rooms.send(NewCurrentRoom(current_room.room_id));
     }
 }
 
-fn is_room_visible(current: &CurrentRoom, room_id: &Room) -> bool {
-    let dq = current.0.q - room_id.0.q;
-    let dr = current.0.r - room_id.0.r;
+pub fn is_room_visible(current: &CurrentRoom, room_id: &Room) -> bool {
+    let dq = current.room_id.q - room_id.0.q;
+    let dr = current.room_id.r - room_id.0.r;
+    let range = current.visible_range as i32;
 
-    dq.abs() <= 1 && dr.abs() <= 1 && (dq + dr).abs() <= 1
+    dq.abs() <= range && dr.abs() <= range && (dq + dr).abs() <= range
 }
 
 fn update_terrain_material_system(
@@ -238,8 +244,8 @@ fn handle_terrain_mesh_tasks_system(
 /// touch the current room and neighbours in the LRU cache to move them to the top of the LRU so
 /// they aren't garbage collected
 fn touch_lru_system(current_room: Res<CurrentRoom>, mut offsets: ResMut<RoomOffsets>) {
-    offsets.0.get(&current_room.0);
-    for neighbour in room_neighbours(current_room.0) {
+    offsets.0.get(&current_room.room_id);
+    for neighbour in room_neighbours(current_room.room_id) {
         offsets.0.get(&neighbour);
     }
 }
@@ -360,10 +366,10 @@ fn update_current_room_system(
 ) {
     for room in incoming.iter() {
         debug!("Change main room to: {:?}", room.0);
-        current_room.0 = room.0;
+        current_room.room_id = room.0;
         client.send_unsubscribe_all();
-        client.send_subscribe_room(current_room.0);
-        client.send_subscribe_multi_room(&room_neighbours(current_room.0));
+        client.send_subscribe_room(current_room.room_id);
+        client.send_subscribe_multi_room(&room_neighbours(current_room.room_id));
     }
 }
 
@@ -385,7 +391,10 @@ impl Plugin for TerrainPlugin {
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
-            .insert_resource(CurrentRoom(AxialPos { q: 15, r: 15 }))
+            .insert_resource(CurrentRoom {
+                room_id: AxialPos { q: -1, r: -1 },
+                visible_range: 1,
+            })
             .insert_resource(RoomOffsets(LruCache::new(32)))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }

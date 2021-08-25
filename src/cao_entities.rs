@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
-use crate::cao_sim_client::{
-    cao_sim_model::{AxialPos, WorldPosition},
-    SimEntityId,
+use crate::{
+    cao_sim_client::{
+        cao_sim_model::{AxialPos, WorldPosition},
+        SimEntityId,
+    },
+    terrain::{is_room_visible, CurrentRoom, Room},
 };
 use lru::LruCache;
 
@@ -40,7 +43,6 @@ pub struct EntityMetadata {
     pub ty: EntityType,
     pub id: Entity,
     pub cao_id: SimEntityId,
-    pub pos: WorldPosition,
     /// timestamp of the metadata
     pub ts: i64,
 }
@@ -57,11 +59,15 @@ pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
 fn entity_gc_system(
     mut cmd: Commands,
     sim2bevy: Res<SimToBevyId>,
-    q: Query<(Entity, &SimEntityId)>,
+    current_room: Res<CurrentRoom>,
+    q: Query<(Entity, &SimEntityId, &WorldPosition)>,
 ) {
-    for (e, se) in q.iter() {
+    for (e, se, wp) in q.iter() {
         if !sim2bevy.0.contains(se) {
             trace!("Deleting dead entity {:?}", se);
+            cmd.entity(e).despawn_recursive();
+        } else if !is_room_visible(&*current_room, &Room(wp.room)) {
+            trace!("Deleting out of range entity {:?}", se);
             cmd.entity(e).despawn_recursive();
         }
     }
@@ -75,30 +81,30 @@ fn handle_new_entity<'a, 'b>(
     wp: WorldPosition,
     moved_event: &mut EventWriter<EntityMovedEvent>,
     spawned_event: &mut EventWriter<NewEntityEvent>,
-    meta_map: &mut Query<&mut EntityMetadata>,
+    meta_map: &mut Query<(&mut EntityMetadata, &mut WorldPosition)>,
     sim2bevy: &mut SimToBevyId,
 ) -> EntityCommands<'a, 'b> {
     let entity_id;
-    if let Some((id, mut metadata)) = sim2bevy
+    if let Some((id, (mut metadata, mut world_pos))) = sim2bevy
         .0
         .get(&cao_id) // moves this entity to the top of the LRU
         .and_then(|id| meta_map.get_mut(*id).ok().map(|x| (id, x)))
         // if the simulation recycled this ID, we treat it as a new entity
-        .and_then(|(id, m)| (m.ty == ty).then(|| (id, m)))
+        .and_then(|(id, m)| (m.0.ty == ty).then(|| (id, m)))
     {
         debug_assert_eq!(metadata.cao_id, cao_id);
         entity_id = *id;
 
         trace!("found entity {:?}", metadata.cao_id);
 
-        if metadata.pos != wp {
+        if *world_pos != wp {
             moved_event.send(EntityMovedEvent {
                 id: entity_id,
                 cao_id,
                 ty,
             });
+            *world_pos = wp.clone();
         }
-        metadata.pos = wp.clone();
         metadata.ts = time;
 
         cmd.entity(metadata.id)
@@ -106,14 +112,13 @@ fn handle_new_entity<'a, 'b>(
         // spawn new entity
         //
         let mut cmd = cmd.spawn();
-        cmd.insert(cao_id).insert(ty);
+        cmd.insert(cao_id).insert(ty).insert(wp.clone());
         entity_id = cmd.id();
 
         let meta = EntityMetadata {
             ty,
             id: entity_id,
             cao_id,
-            pos: wp.clone(),
             ts: time,
         };
 
@@ -137,13 +142,13 @@ fn handle_new_entity<'a, 'b>(
 
 fn update_positions_system(
     mut positions_map: ResMut<EntityPositionMap>,
-    q: Query<(Entity, &EntityMetadata)>,
+    q: Query<(Entity, &WorldPosition)>,
 ) {
     positions_map.0.clear();
-    for (e, m) in q.iter() {
+    for (e, pos) in q.iter() {
         positions_map
             .0
-            .entry(m.pos.absolute_axial())
+            .entry(pos.absolute_axial())
             .or_default()
             .push(e);
     }
@@ -156,7 +161,7 @@ fn on_new_entities_system(
     mut spawned_event: EventWriter<NewEntityEvent>,
     mut latest_ts: ResMut<LatestTime>,
     mut sim2bevy: ResMut<SimToBevyId>,
-    mut meta_map: Query<&mut EntityMetadata>,
+    mut meta_map: Query<(&mut EntityMetadata, &mut WorldPosition)>,
 ) {
     for new_entities in new_entities.iter() {
         let time = new_entities.0.time;

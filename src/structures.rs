@@ -9,7 +9,10 @@ use bevy::{
     },
 };
 
-use crate::cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent};
+use crate::{
+    cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent},
+    cao_sim_client::cao_sim_model::WorldPosition,
+};
 
 pub struct Structure;
 
@@ -60,16 +63,16 @@ fn on_new_entities_system(
     assets: Res<structure_assets::StructureRenderingAssets>,
     mut materials: ResMut<Assets<structure_assets::StructureMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<&EntityMetadata>,
+    q_meta: Query<(&EntityMetadata, &WorldPosition)>,
 ) {
     for new_entity_event in new_entities
         .iter()
         .filter(|e| e.ty == crate::cao_entities::EntityType::Structure)
     {
-        let meta = q_meta.get(new_entity_event.id).unwrap();
+        let (meta, pos) = q_meta.get(new_entity_event.id).unwrap();
         build_structure(
             &mut cmd.entity(meta.id),
-            meta.pos.as_pixel(),
+            pos.as_pixel(),
             &*assets,
             &mut *materials,
         );

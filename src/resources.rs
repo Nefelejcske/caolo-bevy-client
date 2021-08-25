@@ -11,7 +11,7 @@ use bevy::{
 
 use crate::{
     cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
-    cao_sim_client::cao_sim_model,
+    cao_sim_client::cao_sim_model::{self, WorldPosition},
 };
 
 pub struct Resource;
@@ -64,16 +64,16 @@ fn on_new_entities(
     assets: Res<resource_assets::ResourceRenderingAssets>,
     mut materials: ResMut<Assets<resource_assets::ResourceMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<&EntityMetadata>,
+    q_meta: Query<(&EntityMetadata, &WorldPosition)>,
 ) {
     for new_entity_event in new_entities
         .iter()
         .filter(|e| e.ty == crate::cao_entities::EntityType::Resource)
     {
-        let meta = q_meta.get(new_entity_event.id).unwrap();
+        let (meta, wp) = q_meta.get(new_entity_event.id).unwrap();
         build_resource(
             &mut cmd.entity(meta.id),
-            meta.pos.as_pixel(),
+            wp.as_pixel(),
             &*assets,
             &mut *materials,
         );
@@ -82,13 +82,13 @@ fn on_new_entities(
 
 fn on_resource_move_system(
     mut moved_entities: EventReader<EntityMovedEvent>,
-    mut res_data: Query<(&cao_sim_model::Resource, &EntityMetadata, &mut Transform)>,
+    mut res_data: Query<(&cao_sim_model::Resource, &WorldPosition, &mut Transform)>,
 ) {
     for event in moved_entities
         .iter()
         .filter(|m| m.ty == crate::cao_entities::EntityType::Resource)
     {
-        let (_res, meta, mut tr) = match res_data.get_mut(event.id) {
+        let (_res, pos, mut tr) = match res_data.get_mut(event.id) {
             Ok(b) => b,
             Err(err) => {
                 trace!(
@@ -98,7 +98,7 @@ fn on_resource_move_system(
                 continue;
             }
         };
-        tr.translation = pos_2d_to_3d(meta.pos.as_pixel());
+        tr.translation = pos_2d_to_3d(pos.as_pixel());
     }
 }
 

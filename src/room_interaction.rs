@@ -135,7 +135,7 @@ fn update_lookat_room_system(
 
         const RADIUS: i32 = 30; // TODO query this pls...
 
-        let offset = match offsets.0.get(&current.0) {
+        let offset = match offsets.0.get(&current.room_id) {
             Some(x) => x,
             None => continue,
         };
@@ -167,7 +167,7 @@ fn update_lookat_room_system(
                 let room_id = *room_id;
                 room.id = room_id;
                 room.world_pos = point_q;
-                if room_id != current.0 {
+                if room_id != current.room_id {
                     new_current_room.send(crate::terrain::NewCurrentRoom(room_id));
                 }
             }
