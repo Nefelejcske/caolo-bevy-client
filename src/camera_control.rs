@@ -107,7 +107,7 @@ fn setup(mut cmd: Commands) {
 
     let outertr = Transform::from_translation(Vec3::new(map_mid.x, 0., map_mid.z));
 
-    let mut innertr = Transform::from_translation(Vec3::new(map_mid.x, 75., map_mid.z - 45.0));
+    let mut innertr = Transform::from_translation(Vec3::new(map_mid.x, 100., map_mid.z - 35.0));
     innertr.look_at(map_mid, Vec3::Y);
     innertr.translation.x = 0.0;
     innertr.translation.y = 75.0;
