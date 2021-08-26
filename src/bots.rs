@@ -114,12 +114,6 @@ fn update_transform_rot(
     }
 }
 
-/// Does not clamp!
-#[inline]
-fn smoothstep(t: f32) -> f32 {
-    t * t * (3.0 - 2.0 * t)
-}
-
 fn update_walkies_system(time: Res<Time>, mut q: Query<&mut WalkTimer>) {
     let delta = time.delta();
     for mut t in q.iter_mut() {
@@ -129,7 +123,7 @@ fn update_walkies_system(time: Res<Time>, mut q: Query<&mut WalkTimer>) {
 
 fn update_pos_system(mut query: Query<(&LastPos, &NextPos, &mut CurrentPos, &WalkTimer)>) {
     for (last, next, mut curr, t) in query.iter_mut() {
-        curr.0 = last.0.lerp(next.0, smoothstep(t.0.percent()));
+        curr.0 = last.0.lerp(next.0, ezing::quad_inout(t.0.percent()));
     }
 }
 
@@ -146,7 +140,7 @@ fn update_orient_system(
 ) {
     for (last, next, mut curr, t) in query.iter_mut() {
         let t = t.0.percent();
-        curr.0 = last.0.slerp(next.0, smoothstep(t));
+        curr.0 = last.0.slerp(next.0, ezing::quad_inout(t));
     }
 }
 

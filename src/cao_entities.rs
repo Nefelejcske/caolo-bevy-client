@@ -58,12 +58,17 @@ pub fn pos_2d_to_3d(p: Vec2) -> Vec3 {
 // TODO: once entity death events  are available use those + check the visible rooms maybe
 fn entity_gc_system(
     mut cmd: Commands,
+    latest: Res<LatestTime>,
     sim2bevy: Res<SimToBevyId>,
     current_room: Res<CurrentRoom>,
-    q: Query<(Entity, &SimEntityId, &WorldPosition)>,
+    q: Query<(Entity, &SimEntityId, &WorldPosition, &EntityMetadata)>,
 ) {
-    for (e, se, wp) in q.iter() {
-        if !sim2bevy.0.contains(se) {
+    let current_time = latest.0;
+    for (e, se, wp, meta) in q.iter() {
+        if current_time - meta.ts > 3 {
+            trace!("Deleting expired entity {:?}", se);
+            cmd.entity(e).despawn_recursive();
+        } else if !sim2bevy.0.contains(se) {
             trace!("Deleting dead entity {:?}", se);
             cmd.entity(e).despawn_recursive();
         } else if !is_room_visible(&*current_room, &Room(wp.room)) {
