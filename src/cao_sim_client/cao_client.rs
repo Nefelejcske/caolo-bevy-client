@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::sync::Arc;
 
 use super::{cao_sim_model::AxialPos, Connected, NewEntities, NewTerrain};
@@ -57,6 +59,15 @@ impl CaoClient {
         self.send_message(tungstenite::Message::Binary(payload));
     }
 
+    pub fn send_subscribe_room_iter(&self, rooms: impl Iterator<Item = AxialPos>) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "room_ids",
+            "room_ids": rooms.collect::<Vec<_>>()
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
     pub fn send_subscribe_multi_room(&self, rooms: &[AxialPos]) {
         let payload = serde_json::to_vec(&serde_json::json!({
             "ty": "room_ids",
@@ -71,6 +82,24 @@ impl CaoClient {
         let payload = serde_json::to_vec(&serde_json::json!({
             "ty": "unsubscribe_room_id",
             "room_id": room
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
+    pub fn send_unsubscribe_rooms(&self, room_ids: &[AxialPos]) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "unsubscribe_room_ids",
+            "room_ids": room_ids
+        }))
+        .unwrap();
+        self.send_message(tungstenite::Message::Binary(payload));
+    }
+
+    pub fn send_unsubscribe_rooms_iter(&self, room_ids: impl Iterator<Item = AxialPos>) {
+        let payload = serde_json::to_vec(&serde_json::json!({
+            "ty": "unsubscribe_room_ids",
+            "room_ids": room_ids.collect::<Vec<_>>()
         }))
         .unwrap();
         self.send_message(tungstenite::Message::Binary(payload));

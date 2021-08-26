@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{
-    camera_control::RoomCameraTag, cao_sim_client::cao_sim_model::AxialPos, terrain::RoomOffsets,
+    camera_control::RoomCameraTag, cao_sim_client::cao_sim_model::AxialPos, terrain::RoomData,
     AppState,
 };
 
@@ -117,7 +117,7 @@ fn update_lookat_room_system(
     q_cam: Query<&GlobalTransform, With<RoomCameraTag>>,
     current: Res<crate::terrain::CurrentRoom>,
     mut new_current_room: EventWriter<crate::terrain::NewCurrentRoom>,
-    mut offsets: ResMut<RoomOffsets>,
+    mut rooms: ResMut<RoomData>,
 ) {
     for cam_tr in q_cam.iter() {
         let point_q = intersect_ray_terrain_plain(cam_tr.translation, cam_tr.local_z());
@@ -135,8 +135,8 @@ fn update_lookat_room_system(
 
         const RADIUS: i32 = 30; // TODO query this pls...
 
-        let offset = match offsets.0.get(&current.room_id) {
-            Some(x) => x,
+        let offset = match rooms.0.get(&current.room_id) {
+            Some(x) => x.offset,
             None => continue,
         };
         let center = AxialPos {
@@ -151,10 +151,11 @@ fn update_lookat_room_system(
         // back-and-forth
         if delta.q * delta.q + delta.r * delta.r >= (RADIUS * 3 / 2).pow(2) {
             // out of current room
-            if let Some((room_id, _, _)) = offsets
+            if let Some((room_id, _, _)) = rooms
                 .0
                 .iter()
-                .map(|(id, offset)| {
+                .map(|(id, meta)| {
+                    let offset = meta.offset;
                     // distance from center
                     let dq = axial.q - (offset.q + RADIUS);
                     let dr = axial.r - (offset.r + RADIUS);

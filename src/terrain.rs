@@ -1,6 +1,9 @@
 mod terrain_assets;
 
-use std::time;
+use std::{
+    collections::HashSet,
+    time::{self, Duration},
+};
 
 use bevy::{
     prelude::*,
@@ -16,7 +19,7 @@ use crate::{
     cao_entities::pos_2d_to_3d,
     cao_sim_client::{
         cao_client::CaoClient,
-        cao_sim_model::{AxialPos, TerrainTy},
+        cao_sim_model::{AxialPos, TerrainTy, WorldPosition},
         hex_axial_to_pixel, Connected, NewTerrain,
     },
     room_interaction::HoveredTile,
@@ -24,6 +27,10 @@ use crate::{
 use lru::LruCache;
 
 pub struct TerrainPlugin;
+
+struct LastY(pub f32);
+struct NextY(pub f32);
+struct AnimTimer(Timer);
 
 #[derive(Debug, Clone, Copy)]
 pub struct CurrentRoom {
@@ -34,8 +41,14 @@ pub struct NewCurrentRoom(pub AxialPos);
 
 pub struct Room(pub AxialPos);
 
-/// room_id → offset
-pub struct RoomOffsets(pub LruCache<AxialPos, AxialPos>);
+#[derive(Debug, Clone, Copy)]
+pub struct RoomMeta {
+    pub offset: AxialPos,
+    pub entity: Entity,
+}
+
+/// room_id → metadata
+pub struct RoomData(pub LruCache<AxialPos, RoomMeta>);
 
 fn terrain2color(ty: TerrainTy) -> Color {
     match ty {
@@ -46,7 +59,7 @@ fn terrain2color(ty: TerrainTy) -> Color {
     }
 }
 
-fn room_gc_system(mut cmd: Commands, offsets: Res<RoomOffsets>, q: Query<(Entity, &Room)>) {
+fn room_gc_system(mut cmd: Commands, offsets: Res<RoomData>, q: Query<(Entity, &Room)>) {
     for (e, room) in q.iter() {
         if !offsets.0.contains(&room.0) {
             trace!("Garbage collecting room {:?}", room.0);
@@ -183,6 +196,7 @@ struct TerrainMeshResult {
     mesh: Mesh,
     id: AxialPos,
     offset: Vec3,
+    offset_axial: AxialPos,
 }
 
 fn handle_terrain_mesh_tasks_system(
@@ -192,6 +206,7 @@ fn handle_terrain_mesh_tasks_system(
     mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     existing_rooms: Query<(Entity, &Room)>,
+    mut rooms: ResMut<RoomData>,
 ) {
     // TODO: if we split the terrain task into stages we can update all of them here
     for (e, mut task) in tasks.iter_mut().take(2) {
@@ -201,6 +216,7 @@ fn handle_terrain_mesh_tasks_system(
                 mesh,
                 id,
                 offset,
+                offset_axial,
             } = mesh;
 
             // clean up
@@ -220,18 +236,33 @@ fn handle_terrain_mesh_tasks_system(
                 is_visible: 1,
             });
 
-            let transform = Transform::from_translation(offset);
+            let transform = Transform::from_translation(offset - Vec3::Y * 30.0);
 
-            cmd.spawn_bundle(MeshBundle {
-                mesh: mesh_handle,
-                render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                    assets.pipeline.clone_weak(),
-                )]),
-                ..Default::default()
-            })
-            .insert(material)
-            .insert(transform)
-            .insert(Room(id));
+            let entity = cmd
+                .spawn_bundle(MeshBundle {
+                    mesh: mesh_handle,
+                    render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                        assets.pipeline.clone_weak(),
+                    )]),
+                    ..Default::default()
+                })
+                .insert_bundle((
+                    LastY(transform.translation.y),
+                    NextY(offset.y),
+                    AnimTimer(Timer::new(Duration::from_secs(1), false)),
+                ))
+                .insert(material)
+                .insert(transform)
+                .insert(Room(id))
+                .id();
+
+            rooms.0.put(
+                id,
+                RoomMeta {
+                    offset: offset_axial,
+                    entity,
+                },
+            );
 
             let end = std::time::Instant::now();
 
@@ -243,23 +274,21 @@ fn handle_terrain_mesh_tasks_system(
 
 /// touch the current room and neighbours in the LRU cache to move them to the top of the LRU so
 /// they aren't garbage collected
-fn touch_lru_system(current_room: Res<CurrentRoom>, mut offsets: ResMut<RoomOffsets>) {
-    offsets.0.get(&current_room.room_id);
+fn touch_lru_system(current_room: Res<CurrentRoom>, mut rooms: ResMut<RoomData>) {
+    rooms.0.get(&current_room.room_id);
     for neighbour in room_neighbours(current_room.room_id) {
-        offsets.0.get(&neighbour);
+        rooms.0.get(&neighbour);
     }
 }
 
 fn on_new_terrain_system(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
-    mut offsets: ResMut<RoomOffsets>,
     pool: Res<AsyncComputeTaskPool>,
 ) {
     for new_terrain in new_terrain.iter() {
         info!("Got new terrain {:?}", new_terrain.room_id);
         let start = std::time::Instant::now();
-        offsets.0.put(new_terrain.room_id, new_terrain.offset);
         let room_id = new_terrain.room_id;
         let offset = new_terrain.offset;
         let new_terrain = new_terrain.terrain.clone();
@@ -309,6 +338,7 @@ fn on_new_terrain_system(
                 mesh,
                 id: room_id,
                 offset: pos_2d_to_3d(hex_axial_to_pixel(offset.q as f32, offset.r as f32)),
+                offset_axial: offset,
             }
         });
 
@@ -360,16 +390,59 @@ pub fn room_neighbours(axial: AxialPos) -> [AxialPos; 6] {
 }
 
 fn update_current_room_system(
+    mut cache: Local<(HashSet<AxialPos>, HashSet<AxialPos>)>,
     mut incoming: EventReader<NewCurrentRoom>,
     mut current_room: ResMut<CurrentRoom>,
     client: Res<CaoClient>,
 ) {
     for room in incoming.iter() {
         debug!("Change main room to: {:?}", room.0);
+        let currently_visible = room_neighbours(current_room.room_id);
+        let newly_visible = room_neighbours(room.0);
+
+        cache.0.clear();
+        cache.0.extend(currently_visible.iter().copied());
+        cache.0.insert(current_room.room_id);
+
+        cache.1.clear();
+        cache.1.extend(newly_visible.iter().copied());
+        cache.1.insert(room.0);
+
+        let new_rooms = cache.1.difference(&cache.0);
+        client.send_subscribe_room_iter(new_rooms.copied());
+        let old_rooms = cache.0.difference(&cache.1);
+        client.send_unsubscribe_rooms_iter(old_rooms.copied());
+
         current_room.room_id = room.0;
-        client.send_unsubscribe_all();
-        client.send_subscribe_room(current_room.room_id);
-        client.send_subscribe_multi_room(&room_neighbours(current_room.room_id));
+    }
+}
+
+fn lerp_f32(a: f32, b: f32, t: f32) -> f32 {
+    t * (b - a) + a
+}
+
+fn update_pos_system(
+    time: Res<Time>,
+    mut query: Query<(&LastY, &NextY, &mut Transform, &mut AnimTimer)>,
+) {
+    let delta = time.delta();
+    for (last, next, mut curr, mut t) in query.iter_mut() {
+        t.0.tick(delta);
+        curr.translation.y = lerp_f32(last.0, next.0, ezing::elastic_out(t.0.percent()));
+    }
+}
+
+fn update_entity_positions(
+    mut meta: ResMut<RoomData>,
+    mut q: Query<(&mut Transform, &WorldPosition)>,
+    rooms: Query<&GlobalTransform>,
+) {
+    for (mut tr, wp) in q.iter_mut() {
+        if let Some(room) = meta.0.get(&wp.room) {
+            if let Ok(room_tr) = rooms.get(room.entity) {
+                tr.translation.y = room_tr.translation.y + 1.0;
+            }
+        }
     }
 }
 
@@ -388,6 +461,8 @@ impl Plugin for TerrainPlugin {
                 SystemSet::on_update(crate::AppState::Room)
                     .with_system(on_new_terrain_system.system())
                     .with_system(update_terrain_material_system.system())
+                    .with_system(update_pos_system.system())
+                    .with_system(update_entity_positions.system())
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
@@ -395,7 +470,7 @@ impl Plugin for TerrainPlugin {
                 room_id: AxialPos { q: -1, r: -1 },
                 visible_range: 1,
             })
-            .insert_resource(RoomOffsets(LruCache::new(32)))
+            .insert_resource(RoomData(LruCache::new(32)))
             .add_asset::<terrain_assets::TerrainMaterial>();
     }
 }
