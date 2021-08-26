@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use crate::{
-    cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_entities::{EntityMetadata, EntityMovedEvent, NewEntityEvent},
     cao_sim_client::cao_sim_model::{self, EntityPosition},
     mining::MiningEvent,
     room_interaction::SelectedEntity,
@@ -55,8 +55,6 @@ fn build_bot(
         LastRotation(orient),
         NextRotation(orient),
         CurrentRotation(orient),
-        Transform::default(),
-        GlobalTransform::default(),
         WalkTimer(Timer::from_seconds(STEP_TIME, false)),
     ))
     .with_children(|c| {

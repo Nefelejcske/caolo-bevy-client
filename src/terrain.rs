@@ -19,7 +19,7 @@ use crate::{
     cao_entities::pos_2d_to_3d,
     cao_sim_client::{
         cao_client::CaoClient,
-        cao_sim_model::{AxialPos, TerrainTy, EntityPosition},
+        cao_sim_model::{AxialPos, EntityPosition, TerrainTy},
         hex_axial_to_pixel, Connected, NewTerrain,
     },
     room_interaction::HoveredTile,
@@ -59,9 +59,9 @@ fn terrain2color(ty: TerrainTy) -> Color {
     }
 }
 
-fn room_gc_system(mut cmd: Commands, offsets: Res<RoomData>, q: Query<(Entity, &Room)>) {
+fn room_gc_system(mut cmd: Commands, current_room: Res<CurrentRoom>, q: Query<(Entity, &Room)>) {
     for (e, room) in q.iter() {
-        if !offsets.0.contains(&room.0) {
+        if !is_room_visible(&*current_room, &*room) {
             trace!("Garbage collecting room {:?}", room.0);
             cmd.entity(e).despawn_recursive();
         }
@@ -179,14 +179,12 @@ pub fn is_room_visible(current: &CurrentRoom, room_id: &Room) -> bool {
 
 fn update_terrain_material_system(
     selected_tile: Res<HoveredTile>,
-    current_room: Res<CurrentRoom>,
     mut materials: ResMut<Assets<terrain_assets::TerrainMaterial>>,
-    rooms: Query<(&Room, &Handle<terrain_assets::TerrainMaterial>)>,
+    rooms: Query<&Handle<terrain_assets::TerrainMaterial>>,
 ) {
-    for (room_id, room_mat) in rooms.iter() {
+    for room_mat in rooms.iter() {
         if let Some(mat) = materials.get_mut(room_mat) {
             mat.cursor_pos = selected_tile.world_pos;
-            mat.is_visible = is_room_visible(&*current_room, &*room_id) as i32;
         }
     }
 }
@@ -233,7 +231,6 @@ fn handle_terrain_mesh_tasks_system(
 
             let material = materials.add(terrain_assets::TerrainMaterial {
                 cursor_pos: Vec3::ZERO,
-                is_visible: 1,
             });
 
             let transform = Transform::from_translation(offset - Vec3::Y * 30.0);

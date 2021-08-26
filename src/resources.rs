@@ -20,7 +20,6 @@ pub struct ResourcesPlugin;
 
 fn build_resource(
     cmd: &mut EntityCommands,
-    pos: Vec2,
     assets: &resource_assets::ResourceRenderingAssets,
     materials: &mut Assets<resource_assets::ResourceMaterial>,
 ) -> Entity {
@@ -29,22 +28,18 @@ fn build_resource(
         time: 0.0,
     });
 
-    cmd.insert_bundle((
-        Resource,
-        Transform::from_translation(pos_2d_to_3d(pos)),
-        GlobalTransform::default(),
-    ))
-    .with_children(|c| {
-        c.spawn_bundle(MeshBundle {
-            mesh: assets.mesh.clone_weak(),
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                assets.pipeline.clone_weak(),
-            )]),
-            ..Default::default()
+    cmd.insert_bundle((Resource,))
+        .with_children(|c| {
+            c.spawn_bundle(MeshBundle {
+                mesh: assets.mesh.clone_weak(),
+                render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                    assets.pipeline.clone_weak(),
+                )]),
+                ..Default::default()
+            })
+            .insert(material);
         })
-        .insert(material);
-    })
-    .id()
+        .id()
 }
 
 fn update_res_materials(
@@ -64,19 +59,14 @@ fn on_new_entities(
     assets: Res<resource_assets::ResourceRenderingAssets>,
     mut materials: ResMut<Assets<resource_assets::ResourceMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<(&EntityMetadata, &EntityPosition)>,
+    q_meta: Query<&EntityMetadata>,
 ) {
     for new_entity_event in new_entities
         .iter()
         .filter(|e| e.ty == crate::cao_entities::EntityType::Resource)
     {
-        let (meta, wp) = q_meta.get(new_entity_event.id).unwrap();
-        build_resource(
-            &mut cmd.entity(meta.id),
-            wp.as_pixel(),
-            &*assets,
-            &mut *materials,
-        );
+        let meta = q_meta.get(new_entity_event.id).unwrap();
+        build_resource(&mut cmd.entity(meta.id), &*assets, &mut *materials);
     }
 }
 

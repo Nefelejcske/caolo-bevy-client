@@ -9,10 +9,7 @@ use bevy::{
     },
 };
 
-use crate::{
-    cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent},
-    cao_sim_client::cao_sim_model::EntityPosition,
-};
+use crate::cao_entities::{EntityMetadata, NewEntityEvent};
 
 pub struct Structure;
 
@@ -20,7 +17,6 @@ pub struct StructuresPlugin;
 
 fn build_structure(
     cmd: &mut EntityCommands,
-    pos: Vec2,
     assets: &structure_assets::StructureRenderingAssets,
     materials: &mut Assets<structure_assets::StructureMaterial>,
 ) {
@@ -29,12 +25,7 @@ fn build_structure(
         time: 0.0,
     });
 
-    cmd.insert_bundle((
-        Structure,
-        Transform::from_translation(pos_2d_to_3d(pos)),
-        GlobalTransform::default(),
-    ))
-    .with_children(|c| {
+    cmd.insert_bundle((Structure,)).with_children(|c| {
         c.spawn_bundle(MeshBundle {
             mesh: assets.mesh.clone_weak(),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
@@ -63,19 +54,14 @@ fn on_new_entities_system(
     assets: Res<structure_assets::StructureRenderingAssets>,
     mut materials: ResMut<Assets<structure_assets::StructureMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<(&EntityMetadata, &EntityPosition)>,
+    q_meta: Query<&EntityMetadata>,
 ) {
     for new_entity_event in new_entities
         .iter()
         .filter(|e| e.ty == crate::cao_entities::EntityType::Structure)
     {
-        let (meta, pos) = q_meta.get(new_entity_event.id).unwrap();
-        build_structure(
-            &mut cmd.entity(meta.id),
-            pos.as_pixel(),
-            &*assets,
-            &mut *materials,
-        );
+        let meta = q_meta.get(new_entity_event.id).unwrap();
+        build_structure(&mut cmd.entity(meta.id), &*assets, &mut *materials);
     }
 }
 

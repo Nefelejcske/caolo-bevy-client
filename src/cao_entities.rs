@@ -117,7 +117,13 @@ fn handle_new_entity<'a, 'b>(
         // spawn new entity
         //
         let mut cmd = cmd.spawn();
-        cmd.insert_bundle((cao_id, ty, wp.clone()));
+        cmd.insert_bundle((
+            cao_id,
+            ty,
+            wp.clone(),
+            Transform::from_translation(Vec3::Y * -99999.0),
+            GlobalTransform::default(),
+        ));
         entity_id = cmd.id();
 
         let meta = EntityMetadata {
