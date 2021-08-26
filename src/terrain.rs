@@ -249,7 +249,7 @@ fn handle_terrain_mesh_tasks_system(
                 .insert_bundle((
                     LastY(transform.translation.y),
                     NextY(offset.y),
-                    AnimTimer(Timer::new(Duration::from_secs(1), false)),
+                    AnimTimer(Timer::new(Duration::from_secs(2), false)),
                 ))
                 .insert(material)
                 .insert(transform)
