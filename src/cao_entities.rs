@@ -4,7 +4,7 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
     cao_sim_client::{
-        cao_sim_model::{AxialPos, WorldPosition},
+        cao_sim_model::{AxialPos, EntityPosition},
         SimEntityId,
     },
     terrain::{is_room_visible, CurrentRoom, Room},
@@ -61,7 +61,7 @@ fn entity_gc_system(
     latest: Res<LatestTime>,
     sim2bevy: Res<SimToBevyId>,
     current_room: Res<CurrentRoom>,
-    q: Query<(Entity, &SimEntityId, &WorldPosition, &EntityMetadata)>,
+    q: Query<(Entity, &SimEntityId, &EntityPosition, &EntityMetadata)>,
 ) {
     let current_time = latest.0;
     for (e, se, wp, meta) in q.iter() {
@@ -83,10 +83,10 @@ fn handle_new_entity<'a, 'b>(
     cmd: &'b mut Commands<'a>,
     cao_id: SimEntityId,
     ty: EntityType,
-    wp: WorldPosition,
+    wp: EntityPosition,
     moved_event: &mut EventWriter<EntityMovedEvent>,
     spawned_event: &mut EventWriter<NewEntityEvent>,
-    meta_map: &mut Query<(&mut EntityMetadata, &mut WorldPosition)>,
+    meta_map: &mut Query<(&mut EntityMetadata, &mut EntityPosition)>,
     sim2bevy: &mut SimToBevyId,
 ) -> EntityCommands<'a, 'b> {
     let entity_id;
@@ -147,7 +147,7 @@ fn handle_new_entity<'a, 'b>(
 
 fn update_positions_system(
     mut positions_map: ResMut<EntityPositionMap>,
-    q: Query<(Entity, &WorldPosition)>,
+    q: Query<(Entity, &EntityPosition)>,
 ) {
     positions_map.0.clear();
     for (e, pos) in q.iter() {
@@ -166,7 +166,7 @@ fn on_new_entities_system(
     mut spawned_event: EventWriter<NewEntityEvent>,
     mut latest_ts: ResMut<LatestTime>,
     mut sim2bevy: ResMut<SimToBevyId>,
-    mut meta_map: Query<(&mut EntityMetadata, &mut WorldPosition)>,
+    mut meta_map: Query<(&mut EntityMetadata, &mut EntityPosition)>,
 ) {
     for new_entities in new_entities.iter() {
         let time = new_entities.0.time;

@@ -19,7 +19,7 @@ use crate::{
     cao_entities::pos_2d_to_3d,
     cao_sim_client::{
         cao_client::CaoClient,
-        cao_sim_model::{AxialPos, TerrainTy, WorldPosition},
+        cao_sim_model::{AxialPos, TerrainTy, EntityPosition},
         hex_axial_to_pixel, Connected, NewTerrain,
     },
     room_interaction::HoveredTile,
@@ -434,7 +434,7 @@ fn update_pos_system(
 
 fn update_entity_positions(
     mut meta: ResMut<RoomData>,
-    mut q: Query<(&mut Transform, &WorldPosition)>,
+    mut q: Query<(&mut Transform, &EntityPosition)>,
     rooms: Query<&GlobalTransform>,
 ) {
     for (mut tr, wp) in q.iter_mut() {

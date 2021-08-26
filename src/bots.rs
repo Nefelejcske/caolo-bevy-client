@@ -11,7 +11,7 @@ use bevy::{
 
 use crate::{
     cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
-    cao_sim_client::cao_sim_model::{self, WorldPosition},
+    cao_sim_client::cao_sim_model::{self, EntityPosition},
     mining::MiningEvent,
     room_interaction::SelectedEntity,
     AppState,
@@ -185,7 +185,7 @@ fn on_new_entities_system(
     bot_assets: Res<bot_assets::BotRenderingAssets>,
     mut bot_materials: ResMut<Assets<bot_assets::BotMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<(&EntityMetadata, &WorldPosition)>,
+    q_meta: Query<(&EntityMetadata, &EntityPosition)>,
 ) {
     for new_entity_event in new_entities
         .iter()

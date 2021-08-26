@@ -11,7 +11,7 @@ use bevy::{
 
 use crate::{
     cao_entities::{pos_2d_to_3d, EntityMetadata, NewEntityEvent},
-    cao_sim_client::cao_sim_model::WorldPosition,
+    cao_sim_client::cao_sim_model::EntityPosition,
 };
 
 pub struct Structure;
@@ -63,7 +63,7 @@ fn on_new_entities_system(
     assets: Res<structure_assets::StructureRenderingAssets>,
     mut materials: ResMut<Assets<structure_assets::StructureMaterial>>,
     mut new_entities: EventReader<NewEntityEvent>,
-    q_meta: Query<(&EntityMetadata, &WorldPosition)>,
+    q_meta: Query<(&EntityMetadata, &EntityPosition)>,
 ) {
     for new_entity_event in new_entities
         .iter()

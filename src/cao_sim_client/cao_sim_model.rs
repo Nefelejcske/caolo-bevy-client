@@ -43,7 +43,7 @@ pub struct EntitiesPayload {
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Eq, Hash)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
-pub struct WorldPosition {
+pub struct EntityPosition {
     pub room: AxialPos,
     pub pos: AxialPos,
     pub offset: AxialPos,
@@ -64,7 +64,7 @@ pub struct AxialPos {
 #[serde(rename_all = "camelCase")]
 pub struct Bot {
     pub id: i64,
-    pub pos: WorldPosition,
+    pub pos: EntityPosition,
     pub carry: Option<Carry>,
     pub hp: Option<Hp>,
     pub script: Option<Script>,
@@ -132,7 +132,7 @@ pub struct Decay {
 #[serde(default)]
 pub struct Structure {
     pub id: i64,
-    pub pos: WorldPosition,
+    pub pos: EntityPosition,
     pub hp: Hp,
     pub energy: Energy,
     pub energy_regen: i64,
@@ -171,7 +171,7 @@ pub struct Spawn {
 #[serde(default)]
 pub struct Resource {
     pub id: i64,
-    pub pos: WorldPosition,
+    pub pos: EntityPosition,
     #[serde(rename = "ResourceType")]
     pub resource_type: ResourceType,
 }
@@ -184,7 +184,7 @@ pub struct ResourceType {
     pub energy: Energy,
 }
 
-impl WorldPosition {
+impl EntityPosition {
     pub fn as_pixel(&self) -> bevy::math::Vec2 {
         let q = self.pos.q + self.offset.q;
         let r = self.pos.r + self.offset.r;
