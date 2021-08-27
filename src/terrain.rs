@@ -394,22 +394,23 @@ fn update_current_room_system(
     mut current_room: ResMut<CurrentRoom>,
     client: Res<CaoClient>,
 ) {
+    let (ref mut current_visible_set, ref mut newly_visible_set) = &mut *cache;
     for room in incoming.iter() {
         debug!("Change main room to: {:?}", room.0);
         let currently_visible = room_neighbours(current_room.room_id);
         let newly_visible = room_neighbours(room.0);
 
-        cache.0.clear();
-        cache.0.extend(currently_visible.iter().copied());
-        cache.0.insert(current_room.room_id);
+        current_visible_set.clear();
+        current_visible_set.extend(currently_visible.iter().copied());
+        current_visible_set.insert(current_room.room_id);
 
-        cache.1.clear();
-        cache.1.extend(newly_visible.iter().copied());
-        cache.1.insert(room.0);
+        newly_visible_set.clear();
+        newly_visible_set.extend(newly_visible.iter().copied());
+        newly_visible_set.insert(room.0);
 
-        let new_rooms = cache.1.difference(&cache.0);
+        let new_rooms = newly_visible_set.difference(&current_visible_set);
         client.send_subscribe_room_iter(new_rooms.copied());
-        let old_rooms = cache.0.difference(&cache.1);
+        let old_rooms = current_visible_set.difference(&newly_visible_set);
         client.send_unsubscribe_rooms_iter(old_rooms.copied());
 
         current_room.room_id = room.0;

@@ -149,7 +149,7 @@ fn update_lookat_room_system(
         };
         // add bias to the current room so we don't trigger switch if the player moves the camera
         // back-and-forth
-        if delta.q * delta.q + delta.r * delta.r >= (RADIUS * 3 / 2).pow(2) {
+        if delta.q * delta.q + delta.r * delta.r >= (RADIUS * 9 / 8).pow(2) {
             // out of current room
             if let Some((room_id, _, _)) = rooms
                 .0

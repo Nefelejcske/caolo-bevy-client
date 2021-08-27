@@ -102,7 +102,7 @@ fn rig_input_system(
 fn setup(mut cmd: Commands) {
     // TODO:
     // maybe get from an event?
-    let map_mid = cao_sim_client::hex_axial_to_pixel(217., 1147.);
+    let map_mid = cao_sim_client::hex_axial_to_pixel(186., 1116.);
     let map_mid = Vec3::new(map_mid.x, 0.0, map_mid.y);
 
     let outertr = Transform::from_translation(Vec3::new(map_mid.x, 0., map_mid.z));
