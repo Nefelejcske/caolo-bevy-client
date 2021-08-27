@@ -206,8 +206,7 @@ fn handle_terrain_mesh_tasks_system(
     existing_rooms: Query<(Entity, &Room)>,
     mut rooms: ResMut<RoomData>,
 ) {
-    // TODO: if we split the terrain task into stages we can update all of them here
-    for (e, mut task) in tasks.iter_mut().take(2) {
+    for (e, mut task) in tasks.iter_mut() {
         if let Some(mesh) = future::block_on(future::poll_once(&mut *task)) {
             let TerrainMeshResult {
                 start,
@@ -290,11 +289,14 @@ fn on_new_terrain_system(
         let offset = new_terrain.offset;
         let new_terrain = new_terrain.terrain.clone();
         let task = pool.spawn(async move {
+            use futures_lite::StreamExt;
+
             let mut vertices = Vec::with_capacity(new_terrain.len() * 6);
             let mut indices = Vec::with_capacity(new_terrain.len() * 6);
             let mut colors = Vec::with_capacity(new_terrain.len() * 6);
             let mut normals = Vec::with_capacity(new_terrain.len() * 6);
-            for (p, ty) in new_terrain.iter() {
+            let mut stream = futures_lite::stream::iter(new_terrain.as_slice());
+            while let Some((p, ty)) = stream.next().await {
                 let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
                 let mut p = pos_2d_to_3d(p);
                 p.y -= 1.0;
