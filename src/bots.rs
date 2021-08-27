@@ -10,8 +10,11 @@ use bevy::{
 };
 
 use crate::{
-    cao_entities::{EntityMetadata, EntityMovedEvent, NewEntityEvent},
-    cao_sim_client::cao_sim_model::{self, EntityPosition},
+    cao_entities::{self, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_sim_client::{
+        cao_sim_model::{self, EntityPosition},
+        SimEntityId,
+    },
     mining::MiningEvent,
     room_interaction::SelectedEntity,
     AppState,
@@ -155,6 +158,23 @@ type BotPosQuery<'a, 'b> = Query<
     With<Bot>,
 >;
 
+fn on_payload_change_system(
+    mut mining_event: EventWriter<MiningEvent>,
+    data: Query<
+        (Entity, &cao_sim_model::Bot),
+        Or<(Added<cao_sim_model::Bot>, Changed<cao_sim_model::Bot>)>,
+    >,
+) {
+    for (e, pl) in data.iter() {
+        if let Some(mine) = &pl.mine_intent {
+            mining_event.send(MiningEvent {
+                bot_id: e,
+                resource_id: SimEntityId(mine.target_id),
+            });
+        }
+    }
+}
+
 fn on_bot_move_system(
     mut moved_entities: EventReader<EntityMovedEvent>,
     mut bot_q: BotPosQuery,
@@ -187,7 +207,7 @@ fn on_new_entities_system(
 ) {
     for new_entity_event in new_entities
         .iter()
-        .filter(|m| m.ty == crate::cao_entities::EntityType::Bot)
+        .filter(|m| m.ty == cao_entities::EntityType::Bot)
     {
         let (meta, pos) = q_meta.get(new_entity_event.id).unwrap();
         build_bot(
@@ -196,14 +216,6 @@ fn on_new_entities_system(
             &*bot_assets,
             &mut *bot_materials,
         );
-
-        // TODO mining event
-        // if let Some(mine) = &bot.mine_intent {
-        //     mining_event.send(MiningEvent {
-        //         bot_id: meta.id,
-        //         resource_id: SimEntityId(mine.target_id),
-        //     });
-        // }
     }
 }
 
@@ -268,6 +280,7 @@ impl Plugin for BotsPlugin {
                     .with_system(update_transform_rot.system())
                     .with_system(update_bot_materials.system())
                     .with_system(update_walkies_system.system())
+                    .with_system(on_payload_change_system.system())
                     .with_system(update_orient_system.system()),
             )
             .init_resource::<bot_assets::BotRenderingAssets>()

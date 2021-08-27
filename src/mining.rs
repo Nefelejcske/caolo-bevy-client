@@ -1,4 +1,4 @@
-use crate::{bots::Bot, camera_control::RoomCameraTag, cao_sim_client::SimEntityId};
+use crate::{camera_control::RoomCameraTag, cao_sim_client::SimEntityId};
 use bevy::prelude::*;
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ fn move_icon_with_cam(
 
 fn spawn_icon(cmd: &mut Commands, assets: &assets::MiningLaserRenderingAssets, from: Vec3) {
     let mut transform = Transform::from_translation(from);
-    transform.translation.y = 1.1;
+    transform.translation.y += 1.1;
 
     cmd.spawn_bundle((
         transform,
@@ -87,9 +87,9 @@ fn spawn_icon(cmd: &mut Commands, assets: &assets::MiningLaserRenderingAssets, f
     });
 }
 
-fn handle_mining(
+fn handle_mining_system(
     mut events: EventReader<MiningEvent>,
-    q: Query<&GlobalTransform, With<Bot>>,
+    q: Query<&GlobalTransform>,
     mut cmd: Commands,
     assets: Res<assets::MiningLaserRenderingAssets>,
 ) {
@@ -97,6 +97,11 @@ fn handle_mining(
         if let Some(bot_tr) = q.get(event.bot_id).ok() {
             trace!("Spawning mining icon at {:?}", bot_tr.translation);
             spawn_icon(&mut cmd, &*assets, bot_tr.translation);
+        } else {
+            error!(
+                "Received mining event on a bot with no transform {:?}",
+                event
+            );
         }
     }
 }
@@ -121,7 +126,7 @@ impl Plugin for MiningPlugin {
         app.add_startup_system(setup.system())
             .add_system_set(
                 SystemSet::on_update(crate::AppState::Room)
-                    .with_system(handle_mining.system())
+                    .with_system(handle_mining_system.system())
                     .with_system(laser_animation_system.system())
                     .with_system(cleanup_system.system())
                     .with_system(move_icon_with_cam.system()),
