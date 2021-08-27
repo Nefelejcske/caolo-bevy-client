@@ -97,11 +97,6 @@ fn handle_mining_system(
         if let Some(bot_tr) = q.get(event.bot_id).ok() {
             trace!("Spawning mining icon at {:?}", bot_tr.translation);
             spawn_icon(&mut cmd, &*assets, bot_tr.translation);
-        } else {
-            error!(
-                "Received mining event on a bot with no transform {:?}",
-                event
-            );
         }
     }
 }
