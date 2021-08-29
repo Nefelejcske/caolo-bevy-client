@@ -509,6 +509,7 @@ impl Plugin for TerrainPlugin {
                     .with_system(update_pos_system.system())
                     .with_system(update_entity_positions.system())
                     .with_system(animate_mesh_system.system())
+                    .with_system(remove_stale_animations_system.system())
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
