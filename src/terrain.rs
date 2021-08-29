@@ -304,6 +304,15 @@ fn animate_mesh_system(
     }
 }
 
+fn remove_stale_animations_system(mut cmd: Commands, q: Query<(Entity, &AnimTimer)>) {
+    for (e, t) in q.iter() {
+        if t.0.finished() {
+            cmd.entity(e)
+                .remove_bundle::<(AnimTimer, AnimatedVertices)>();
+        }
+    }
+}
+
 fn on_new_terrain_system(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
