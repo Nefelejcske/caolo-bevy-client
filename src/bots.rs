@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use crate::{
-    cao_entities::{self, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_entities::{self, pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
     cao_sim_client::{
         cao_sim_model::{self, EntityPosition},
         SimEntityId,
@@ -90,10 +90,9 @@ fn update_bot_materials(
     });
 }
 
-fn update_transform_pos2d(mut query: Query<(&CurrentPos, &mut Transform)>) {
+fn update_transform_pos_system(mut query: Query<(&CurrentPos, &mut Transform)>) {
     for (CurrentPos(p), mut tr) in query.iter_mut() {
-        tr.translation.x = p.x;
-        tr.translation.z = p.y;
+        tr.translation = pos_2d_to_3d(*p)
     }
 }
 
@@ -276,7 +275,7 @@ impl Plugin for BotsPlugin {
                     .with_system(update_pos_system.system())
                     .with_system(on_new_entities_system.system())
                     .with_system(on_bot_move_system.system())
-                    .with_system(update_transform_pos2d.system())
+                    .with_system(update_transform_pos_system.system())
                     .with_system(update_transform_rot.system())
                     .with_system(update_bot_materials.system())
                     .with_system(update_walkies_system.system())

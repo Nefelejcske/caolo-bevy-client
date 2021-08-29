@@ -19,7 +19,7 @@ use crate::{
     cao_entities::pos_2d_to_3d,
     cao_sim_client::{
         cao_client::CaoClient,
-        cao_sim_model::{AxialPos, EntityPosition, TerrainTy},
+        cao_sim_model::{AxialPos, TerrainTy},
         hex_axial_to_pixel, Connected, NewTerrain,
     },
     room_interaction::HoveredTile,
@@ -28,8 +28,6 @@ use lru::LruCache;
 
 pub struct TerrainPlugin;
 
-struct LastY(pub f32);
-struct NextY(pub f32);
 struct AnimTimer(Timer);
 
 #[derive(Debug, Clone, Copy)]
@@ -239,7 +237,7 @@ fn handle_terrain_mesh_tasks_system(
                 cursor_pos: Vec3::ZERO,
             });
 
-            let transform = Transform::from_translation(offset - Vec3::Y * 30.0);
+            let transform = Transform::from_translation(offset);
 
             let [to, from] = vertices;
             let entity = cmd
@@ -251,9 +249,7 @@ fn handle_terrain_mesh_tasks_system(
                     ..Default::default()
                 })
                 .insert_bundle((
-                    LastY(transform.translation.y),
-                    NextY(offset.y),
-                    AnimTimer(Timer::new(Duration::from_secs(2), false)),
+                    AnimTimer(Timer::new(Duration::from_millis(666), false)),
                     AnimatedVertices { from, to },
                 ))
                 .insert(material)
@@ -294,7 +290,7 @@ fn animate_mesh_system(
         debug_assert!(vert.from.len() == vert.to.len());
         let mut v = Vec::with_capacity(vert.from.len());
 
-        let t = ezing::back_out(t.0.percent());
+        let t = ezing::quad_out(t.0.percent());
 
         for ([_, y1, _], [x, y2, z]) in vert.from.iter().zip(vert.to.iter()) {
             v.push([*x, lerp_f32(*y1, *y2, t), *z]);
@@ -358,7 +354,7 @@ fn on_new_terrain_system(
                     &mut normals,
                 );
 
-                let yoffset = -10.0 * fastrand::f32(); // * 2.0 - 1.0); // remap to [-1‥1]
+                let yoffset = -100.0 * fastrand::f32(); // * 2.0 - 1.0); // remap to [-1‥1]
                 vertices_b.extend(
                     vertices_a[vertex0ind as usize..]
                         .iter()
@@ -371,7 +367,7 @@ fn on_new_terrain_system(
                 }
             }
             let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
-            mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices_a.clone());
+            mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices_b.clone());
             mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
             mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
             mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
@@ -466,28 +462,10 @@ fn lerp_f32(a: f32, b: f32, t: f32) -> f32 {
     t * (b - a) + a
 }
 
-fn update_pos_system(
-    time: Res<Time>,
-    mut query: Query<(&LastY, &NextY, &mut Transform, &mut AnimTimer)>,
-) {
+fn tick_anim_timer_system(time: Res<Time>, mut query: Query<&mut AnimTimer>) {
     let delta = time.delta();
-    for (last, next, mut curr, mut t) in query.iter_mut() {
+    for mut t in query.iter_mut() {
         t.0.tick(delta);
-        curr.translation.y = lerp_f32(last.0, next.0, ezing::elastic_out(t.0.percent()));
-    }
-}
-
-fn update_entity_positions(
-    mut meta: ResMut<RoomData>,
-    mut q: Query<(&mut Transform, &EntityPosition)>,
-    rooms: Query<&GlobalTransform>,
-) {
-    for (mut tr, wp) in q.iter_mut() {
-        if let Some(room) = meta.0.get(&wp.room) {
-            if let Ok(room_tr) = rooms.get(room.entity) {
-                tr.translation.y = room_tr.translation.y + 1.0;
-            }
-        }
     }
 }
 
@@ -506,8 +484,7 @@ impl Plugin for TerrainPlugin {
                 SystemSet::on_update(crate::AppState::Room)
                     .with_system(on_new_terrain_system.system())
                     .with_system(update_terrain_material_system.system())
-                    .with_system(update_pos_system.system())
-                    .with_system(update_entity_positions.system())
+                    .with_system(tick_anim_timer_system.system())
                     .with_system(animate_mesh_system.system())
                     .with_system(remove_stale_animations_system.system())
                     .with_system(on_reconnect_system.system()),
