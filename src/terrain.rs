@@ -191,10 +191,16 @@ fn update_terrain_material_system(
 
 struct TerrainMeshResult {
     start: time::Instant,
+    vertices: [Vec<[f32; 3]>; 2],
     mesh: Mesh,
     id: AxialPos,
     offset: Vec3,
     offset_axial: AxialPos,
+}
+
+struct AnimatedVertices {
+    from: Vec<[f32; 3]>,
+    to: Vec<[f32; 3]>,
 }
 
 fn handle_terrain_mesh_tasks_system(
@@ -214,6 +220,7 @@ fn handle_terrain_mesh_tasks_system(
                 id,
                 offset,
                 offset_axial,
+                vertices,
             } = mesh;
 
             // clean up
@@ -234,6 +241,7 @@ fn handle_terrain_mesh_tasks_system(
 
             let transform = Transform::from_translation(offset - Vec3::Y * 30.0);
 
+            let [to, from] = vertices;
             let entity = cmd
                 .spawn_bundle(MeshBundle {
                     mesh: mesh_handle,
@@ -246,6 +254,7 @@ fn handle_terrain_mesh_tasks_system(
                     LastY(transform.translation.y),
                     NextY(offset.y),
                     AnimTimer(Timer::new(Duration::from_secs(2), false)),
+                    AnimatedVertices { from, to },
                 ))
                 .insert(material)
                 .insert(transform)
@@ -277,6 +286,24 @@ fn touch_lru_system(current_room: Res<CurrentRoom>, mut rooms: ResMut<RoomData>)
     }
 }
 
+fn animate_mesh_system(
+    mut meshes: ResMut<Assets<Mesh>>,
+    q: Query<(&AnimTimer, &AnimatedVertices, &Handle<Mesh>)>,
+) {
+    for (t, vert, mesh) in q.iter() {
+        debug_assert!(vert.from.len() == vert.to.len());
+        let mut v = Vec::with_capacity(vert.from.len());
+
+        let t = ezing::back_out(t.0.percent());
+
+        for ([_, y1, _], [x, y2, z]) in vert.from.iter().zip(vert.to.iter()) {
+            v.push([*x, lerp_f32(*y1, *y2, t), *z]);
+        }
+        let mesh = meshes.get_mut(mesh).unwrap();
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, v);
+    }
+}
+
 fn on_new_terrain_system(
     mut cmd: Commands,
     mut new_terrain: EventReader<NewTerrain>,
@@ -291,7 +318,8 @@ fn on_new_terrain_system(
         let task = pool.spawn(async move {
             use futures_lite::StreamExt;
 
-            let mut vertices = Vec::with_capacity(new_terrain.len() * 6);
+            let mut vertices_a = Vec::with_capacity(new_terrain.len() * 6);
+            let mut vertices_b = Vec::with_capacity(new_terrain.len() * 6);
             let mut indices = Vec::with_capacity(new_terrain.len() * 6);
             let mut colors = Vec::with_capacity(new_terrain.len() * 6);
             let mut normals = Vec::with_capacity(new_terrain.len() * 6);
@@ -308,17 +336,24 @@ fn on_new_terrain_system(
                     _ => &[-1.],
                 };
                 let l = ys.len();
-                let vertex0ind = vertices.len() as u16;
+                let vertex0ind = vertices_a.len() as u16;
 
                 _build_hex_prism_bases(
                     ys,
                     p,
                     color,
                     0.95,
-                    &mut vertices,
+                    &mut vertices_a,
                     &mut indices,
                     &mut colors,
                     &mut normals,
+                );
+
+                let yoffset = -10.0 * fastrand::f32(); // * 2.0 - 1.0); // remap to [-1‥1]
+                vertices_b.extend(
+                    vertices_a[vertex0ind as usize..]
+                        .iter()
+                        .map(|[x, y, z]| [*x, *y + yoffset, *z]),
                 );
 
                 debug_assert!(l <= 2);
@@ -327,13 +362,14 @@ fn on_new_terrain_system(
                 }
             }
             let mut mesh = Mesh::new(bevy::render::pipeline::PrimitiveTopology::TriangleList);
-            mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+            mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices_a.clone());
             mesh.set_attribute(Mesh::ATTRIBUTE_COLOR, colors);
             mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
             mesh.set_indices(Some(bevy::render::mesh::Indices::U16(indices)));
 
             TerrainMeshResult {
                 start,
+                vertices: [vertices_a, vertices_b],
                 mesh,
                 id: room_id,
                 offset: pos_2d_to_3d(hex_axial_to_pixel(offset.q as f32, offset.r as f32)),
@@ -463,6 +499,7 @@ impl Plugin for TerrainPlugin {
                     .with_system(update_terrain_material_system.system())
                     .with_system(update_pos_system.system())
                     .with_system(update_entity_positions.system())
+                    .with_system(animate_mesh_system.system())
                     .with_system(on_reconnect_system.system()),
             )
             .init_resource::<terrain_assets::TerrainRenderingAssets>()
