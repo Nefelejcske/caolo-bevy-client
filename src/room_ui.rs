@@ -40,10 +40,15 @@ fn selected_entity_window_system(
     selected_entity: Res<SelectedEntity>,
     // FIXME
     // add data to the window...
+    cao_id_q: Query<&crate::cao_sim_client::SimEntityId>,
 ) {
     egui::Window::new("Selected Entity").show(egui_ctx.ctx(), |ui| {
         if let Some(selected) = selected_entity.entity {
             ui.label(format!("EntityID: {:?}", selected));
+
+            if let Ok(id) = cao_id_q.get(selected) {
+                ui.label(format!("Sim-ID: {:?}", id));
+            }
 
             // match selected_entity.ty {
             //     // crate::EntityType::Undefined => {
