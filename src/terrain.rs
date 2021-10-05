@@ -250,7 +250,7 @@ fn handle_terrain_mesh_tasks_system(
                 })
                 .insert_bundle((
                     AnimTimer(Timer::new(
-                        Duration::from_millis(fastrand::u64(300..1000)),
+                        Duration::from_millis(fastrand::u64(150..500)),
                         false,
                     )),
                     AnimatedVertices { from, to },
@@ -357,7 +357,7 @@ fn on_new_terrain_system(
                     &mut normals,
                 );
 
-                let yoffset = -100.0 * fastrand::f32(); // * 2.0 - 1.0); // remap to [-1‥1]
+                let yoffset = 100.0 * fastrand::f32();
                 vertices_b.extend(
                     vertices_a[vertex0ind as usize..]
                         .iter()
