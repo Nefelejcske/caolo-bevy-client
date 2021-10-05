@@ -79,7 +79,7 @@ struct ConnectedRcv(crossbeam::channel::Receiver<Connected>);
 struct MessageSender(crossbeam::channel::Sender<tungstenite::Message>);
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct SimEntityId(pub i64);
+pub struct SimEntityId(pub u64);
 
 pub fn hex_axial_to_pixel(q: f32, r: f32) -> Vec2 {
     const SQRT3: f32 = 1.732_050_8;

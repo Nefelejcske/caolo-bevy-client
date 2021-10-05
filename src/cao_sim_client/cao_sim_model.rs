@@ -63,7 +63,7 @@ pub struct AxialPos {
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Bot {
-    pub id: i64,
+    pub id: u64,
     pub pos: EntityPosition,
     pub carry: Option<Carry>,
     pub hp: Option<Hp>,
@@ -79,13 +79,13 @@ pub struct Bot {
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DropoffIntent {
-    pub target_id: i64,
+    pub target_id: u64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MineIntent {
-    pub target_id: i64,
+    pub target_id: u64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -131,7 +131,7 @@ pub struct Decay {
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Structure {
-    pub id: i64,
+    pub id: u64,
     pub pos: EntityPosition,
     pub hp: Hp,
     pub energy: Energy,
@@ -162,15 +162,15 @@ pub struct StructureType {
 #[serde(default)]
 pub struct Spawn {
     pub time_to_spawn: i64,
-    pub spawning: i64,
-    pub spawn_queue: Vec<i64>,
+    pub spawning: u64,
+    pub spawn_queue: Vec<u64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Resource {
-    pub id: i64,
+    pub id: u64,
     pub pos: EntityPosition,
     #[serde(rename = "ResourceType")]
     pub resource_type: ResourceType,
