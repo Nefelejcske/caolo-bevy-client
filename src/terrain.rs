@@ -250,7 +250,7 @@ fn handle_terrain_mesh_tasks_system(
                 })
                 .insert_bundle((
                     AnimTimer(Timer::new(
-                        Duration::from_millis(fastrand::u64(150..500)),
+                        Duration::from_millis(fastrand::u64(300..750)),
                         false,
                     )),
                     AnimatedVertices { from, to },
@@ -293,7 +293,7 @@ fn animate_mesh_system(
         debug_assert!(vert.from.len() == vert.to.len());
         let mut v = Vec::with_capacity(vert.from.len());
 
-        let t = ezing::quad_in(t.0.percent());
+        let t = ezing::cubic_out(t.0.percent());
 
         for ([_, y1, _], [x, y2, z]) in vert.from.iter().zip(vert.to.iter()) {
             v.push([*x, lerp_f32(*y1, *y2, t), *z]);
