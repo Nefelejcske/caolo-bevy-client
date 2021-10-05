@@ -47,7 +47,7 @@ fn selected_entity_window_system(
             ui.label(format!("EntityID: {:?}", selected));
 
             if let Ok(id) = cao_id_q.get(selected) {
-                ui.label(format!("Sim-ID: {:?}", id));
+                ui.label(format!("Sim-ID: {:#x}", id.0));
             }
 
             // match selected_entity.ty {
