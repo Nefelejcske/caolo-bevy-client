@@ -22,24 +22,22 @@ fn build_resource(
     cmd: &mut EntityCommands,
     assets: &resource_assets::ResourceRenderingAssets,
     materials: &mut Assets<resource_assets::ResourceMaterial>,
-) -> Entity {
+) {
     let material = materials.add(resource_assets::ResourceMaterial {
         color: Color::rgb(0.2, 0.2, 0.8),
         time: 0.0,
     });
 
-    cmd.insert_bundle((Resource,))
-        .with_children(|c| {
-            c.spawn_bundle(MeshBundle {
-                mesh: assets.mesh.clone_weak(),
-                render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                    assets.pipeline.clone_weak(),
-                )]),
-                ..Default::default()
-            })
-            .insert(material);
+    cmd.insert_bundle((Resource,)).with_children(|c| {
+        c.spawn_bundle(MeshBundle {
+            mesh: assets.mesh.clone(),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                assets.pipeline.clone(),
+            )]),
+            ..Default::default()
         })
-        .id()
+        .insert(material);
+    });
 }
 
 fn update_res_materials(

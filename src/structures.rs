@@ -9,7 +9,10 @@ use bevy::{
     },
 };
 
-use crate::cao_entities::{EntityMetadata, NewEntityEvent};
+use crate::{
+    cao_entities::{pos_2d_to_3d, EntityMetadata, EntityMovedEvent, NewEntityEvent},
+    cao_sim_client::cao_sim_model::{self, EntityPosition},
+};
 
 pub struct Structure;
 
@@ -27,9 +30,9 @@ fn build_structure(
 
     cmd.insert_bundle((Structure,)).with_children(|c| {
         c.spawn_bundle(MeshBundle {
-            mesh: assets.mesh.clone_weak(),
+            mesh: assets.mesh.clone(),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                assets.pipeline.clone_weak(),
+                assets.pipeline.clone(),
             )]),
             ..Default::default()
         })
@@ -62,6 +65,28 @@ fn on_new_entities_system(
     {
         let meta = q_meta.get(new_entity_event.id).unwrap();
         build_structure(&mut cmd.entity(meta.id), &*assets, &mut *materials);
+    }
+}
+
+fn on_structure_move_system(
+    mut moved_entities: EventReader<EntityMovedEvent>,
+    mut res_data: Query<(&cao_sim_model::Structure, &EntityPosition, &mut Transform)>,
+) {
+    for event in moved_entities
+        .iter()
+        .filter(|m| m.ty == crate::cao_entities::EntityType::Structure)
+    {
+        let (_res, pos, mut tr) = match res_data.get_mut(event.id) {
+            Ok(b) => b,
+            Err(err) => {
+                trace!(
+                    "Received structure moved event but the entity can't be queried {:?}",
+                    err
+                );
+                continue;
+            }
+        };
+        tr.translation = pos_2d_to_3d(pos.as_pixel());
     }
 }
 
@@ -100,9 +125,13 @@ fn setup_system(
 impl Plugin for StructuresPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(setup_system.system())
-            .add_system(on_new_entities_system.system())
-            .add_system(update_materials_system.system())
             .init_resource::<structure_assets::StructureRenderingAssets>()
-            .add_asset::<structure_assets::StructureMaterial>();
+            .add_asset::<structure_assets::StructureMaterial>()
+            .add_system_set(
+                SystemSet::on_update(crate::AppState::Room)
+                    .with_system(on_new_entities_system.system())
+                    .with_system(update_materials_system.system())
+                    .with_system(on_structure_move_system.system()),
+            );
     }
 }
