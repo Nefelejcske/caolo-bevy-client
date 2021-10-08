@@ -142,17 +142,18 @@ fn setup(mut cmd: Commands) {
             DefaultPosition(outertr.translation),
         ))
         .with_children(move |c| {
+            let pos = Vec3::new(0.0, 75.0, -55.0);
             let mut innertr =
                 Transform::from_translation(Vec3::new(map_mid.x, 100., map_mid.z - 35.0));
             innertr.look_at(map_mid, Vec3::Y);
-            innertr.translation.x = 0.0;
-            innertr.translation.y = 75.0;
-            innertr.translation.z = -55.0;
+            innertr.translation = pos;
+
+            let z = innertr.local_z();
 
             let zoom = Zoom {
                 t: 0.5,
-                min: innertr.translation - innertr.local_z() * 50.0,
-                max: innertr.translation + innertr.local_z() * 250.0,
+                min: pos - z * 50.0,
+                max: pos + z * 250.0,
             };
 
             update_inner_camera_pos(&mut innertr, &zoom);
