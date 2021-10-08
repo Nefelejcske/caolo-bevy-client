@@ -118,6 +118,19 @@ fn update_menu_system(
     });
 }
 
+fn back_to_menu_system(keys: Res<Input<KeyCode>>, mut state: ResMut<State<AppState>>) {
+    if keys.just_pressed(KeyCode::Escape) {
+        match state.current() {
+            AppState::MainMenu => {
+                state.pop().unwrap_or_default();
+            }
+            AppState::Room | AppState::CaoLangEditor => {
+                state.push(AppState::MainMenu).unwrap_or_default();
+            }
+        }
+    }
+}
+
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_startup_system(login_via_env_system.system())
@@ -130,6 +143,7 @@ impl Plugin for MainMenuPlugin {
                 SystemSet::new()
                     .with_system(login_system.system())
                     .with_run_criteria(is_not_logged_in_system.system()),
-            );
+            )
+            .add_system(back_to_menu_system.system());
     }
 }
