@@ -41,24 +41,33 @@ fn selected_entity_window_system(
     // FIXME
     // add data to the window...
     cao_id_q: Query<&crate::cao_sim_client::SimEntityId>,
+    bot_q: Query<&crate::cao_sim_client::cao_sim_model::Bot>,
+    res_q: Query<&crate::cao_sim_client::cao_sim_model::Resource>,
+    stu_q: Query<&crate::cao_sim_client::cao_sim_model::Structure>,
 ) {
-    egui::Window::new("Selected Entity").show(egui_ctx.ctx(), |ui| {
-        if let Some(selected) = selected_entity.entity {
-            ui.label(format!("EntityID: {:?}", selected));
+    egui::Window::new("Selected Entity")
+        .default_height(750.)
+        .show(egui_ctx.ctx(), |ui| {
+            if let Some(selected) = selected_entity.entity {
+                ui.label(format!("EntityID: {:?}", selected));
 
-            if let Ok(id) = cao_id_q.get(selected) {
-                ui.label(format!("Sim-ID: {:#x}", id.0));
+                if let Ok(id) = cao_id_q.get(selected) {
+                    ui.label(format!("Sim-ID: {:#x}", id.0));
+                }
+
+                if let Ok(bot) = bot_q.get(selected) {
+                    ui.label(format!("{:#?}", bot));
+                }
+
+                if let Ok(structure) = stu_q.get(selected) {
+                    ui.label(format!("{:#?}", structure));
+                }
+
+                if let Ok(resource) = res_q.get(selected) {
+                    ui.label(format!("{:#?}", resource));
+                }
             }
-
-            // match selected_entity.ty {
-            //     // crate::EntityType::Undefined => {
-            //     //     error!("Undefined entity type for entity {:?}", selected.0 .0);
-            //     //     ui.label("Unrecognised entity!");
-            //     // }
-            //     _ => todo!(),
-            // }
-        }
-    });
+        });
 }
 
 fn diagnostics_ui_system(egui_ctx: Res<EguiContext>, diagnostics: Res<Diagnostics>) {
