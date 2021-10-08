@@ -161,7 +161,7 @@ fn setup(mut cmd: Commands) {
                 .insert_bundle(PerspectiveCameraBundle::new_3d())
                 .insert(zoom)
                 .insert(innertr)
-                .insert(Velocity(1.0))
+                .insert(Velocity(2.0))
                 .insert(RoomCameraTag);
         });
 }
