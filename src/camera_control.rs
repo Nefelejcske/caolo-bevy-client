@@ -10,6 +10,13 @@ pub struct RoomCameraTag;
 pub struct RoomCameraRigTag;
 
 struct TargetRotation(Quat);
+
+#[derive(Debug)]
+struct Zoom {
+    t: f32,
+    min: Vec3,
+    max: Vec3,
+}
 struct Velocity(f32);
 struct DefaultPosition(Vec3);
 
@@ -24,19 +31,37 @@ fn rig_rotation_system(mut cam_rigs: Query<(&mut Transform, &TargetRotation)>) {
     }
 }
 
+fn inv_lerp(a: f32, b: f32, val: f32) -> f32 {
+    (val - a) / (b - a)
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    t * (b - a) + a
+}
+
+fn eerp(a: f32, b: f32, t: f32) -> f32 {
+    2.0f32.powf(lerp(a.log2(), b.log2(), t))
+}
+
+fn update_inner_camera_pos(tr: &mut Transform, zoom: &Zoom) {
+    let t = eerp(1.0, 8.0, zoom.t);
+    let t = inv_lerp(1.0, 8.0, t);
+
+    let pos = zoom.min.lerp(zoom.max, t);
+
+    tr.translation = pos;
+}
+
 fn inner_camera_input_system(
     time: Res<Time>,
     mut mouse_input: EventReader<MouseWheel>,
-    mut cams: Query<(&mut Transform, &Velocity), With<RoomCameraTag>>,
+    mut cams: Query<(&mut Transform, &Velocity, &mut Zoom), With<RoomCameraTag>>,
 ) {
     for event in mouse_input.iter() {
-        for (mut tr, vel) in cams.iter_mut() {
-            let forward = tr.local_z();
-            let pos = tr.translation + (forward * -event.y * vel.0 * time.delta_seconds());
-            // zoom bounds
-            if 5.0 <= pos.y && pos.y <= 200. {
-                tr.translation = pos;
-            }
+        for (mut tr, vel, mut zoom) in cams.iter_mut() {
+            zoom.t = (zoom.t - event.y * vel.0 * time.delta_seconds()).clamp(0.0, 1.0);
+
+            update_inner_camera_pos(&mut *tr, &*zoom);
         }
     }
 }
@@ -107,12 +132,6 @@ fn setup(mut cmd: Commands) {
 
     let outertr = Transform::from_translation(Vec3::new(map_mid.x, 0., map_mid.z));
 
-    let mut innertr = Transform::from_translation(Vec3::new(map_mid.x, 100., map_mid.z - 35.0));
-    innertr.look_at(map_mid, Vec3::Y);
-    innertr.translation.x = 0.0;
-    innertr.translation.y = 75.0;
-    innertr.translation.z = -55.0;
-
     cmd.spawn()
         .insert_bundle((
             Velocity(150.0),
@@ -123,10 +142,26 @@ fn setup(mut cmd: Commands) {
             DefaultPosition(outertr.translation),
         ))
         .with_children(move |c| {
+            let mut innertr =
+                Transform::from_translation(Vec3::new(map_mid.x, 100., map_mid.z - 35.0));
+            innertr.look_at(map_mid, Vec3::Y);
+            innertr.translation.x = 0.0;
+            innertr.translation.y = 75.0;
+            innertr.translation.z = -55.0;
+
+            let zoom = Zoom {
+                t: 0.5,
+                min: innertr.translation - innertr.local_z() * 50.0,
+                max: innertr.translation + innertr.local_z() * 250.0,
+            };
+
+            update_inner_camera_pos(&mut innertr, &zoom);
+
             c.spawn()
                 .insert_bundle(PerspectiveCameraBundle::new_3d())
+                .insert(zoom)
                 .insert(innertr)
-                .insert(Velocity(200.0))
+                .insert(Velocity(1.0))
                 .insert(RoomCameraTag);
         });
 }
