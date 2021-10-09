@@ -44,8 +44,12 @@ fn eerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 fn update_inner_camera_pos(tr: &mut Transform, zoom: &Zoom) {
-    let zoom_value = eerp(1.0, 8.0, zoom.t);
-    let t = inv_lerp(1.0, 8.0, zoom_value);
+    const ZOOM_MIN: f32 = 1.0;
+    const ZOOM_MAX: f32 = 10.0;
+
+    let zoom_value = eerp(ZOOM_MIN, ZOOM_MAX, zoom.t);
+    // remap zoom_vaule to zoom position
+    let t = inv_lerp(ZOOM_MIN, ZOOM_MAX, zoom_value);
     tr.translation = zoom.min.lerp(zoom.max, t);
 }
 
