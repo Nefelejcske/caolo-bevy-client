@@ -59,14 +59,20 @@ pub struct AxialPos {
     pub r: i32,
 }
 
+impl std::fmt::Display for AxialPos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}]", self.q, self.r)
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Bot {
     pub id: u64,
     pub pos: EntityPosition,
-    pub carry: Option<Carry>,
-    pub hp: Option<Hp>,
+    pub carry: Option<BoundedValue>,
+    pub hp: Option<BoundedValue>,
     pub script: Option<Script>,
     pub owner: Option<Owner>,
     pub decay: Option<Decay>,
@@ -91,15 +97,7 @@ pub struct MineIntent {
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
-pub struct Carry {
-    pub value: i64,
-    pub value_max: i64,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-#[serde(rename_all = "camelCase")]
-pub struct Hp {
+pub struct BoundedValue {
     pub value: i64,
     pub value_max: i64,
 }
@@ -133,20 +131,12 @@ pub struct Decay {
 pub struct Structure {
     pub id: u64,
     pub pos: EntityPosition,
-    pub hp: Hp,
-    pub energy: Energy,
+    pub hp: BoundedValue,
+    pub energy: BoundedValue,
     pub energy_regen: i64,
     pub owner: Owner,
     #[serde(rename = "StructureType")]
     pub structure_type: StructureType,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(default)]
-pub struct Energy {
-    pub value: i64,
-    pub value_max: i64,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -181,7 +171,7 @@ pub struct Resource {
 #[serde(default)]
 pub struct ResourceType {
     #[serde(rename = "Energy")]
-    pub energy: Energy,
+    pub energy: BoundedValue,
 }
 
 impl EntityPosition {
