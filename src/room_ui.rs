@@ -1,6 +1,6 @@
 use crate::{
     cao_sim_client::{cao_sim_model, ConnectionStateRes, NewEntities},
-    room_interaction::{HoveredTile, LookAtRoom, SelectedEntity},
+    room_interaction::{HoveredTile, SelectedEntity},
     terrain::CurrentRoom,
 };
 use bevy::{diagnostic::Diagnostics, prelude::*};
@@ -23,7 +23,6 @@ fn update_ui_system(
     connection_state: Res<ConnectionStateRes>,
     current_room: Res<CurrentRoom>,
     hovered: Res<HoveredTile>,
-    lat_room: Res<LookAtRoom>,
 ) {
     let connection_state = connection_state.load(std::sync::atomic::Ordering::Relaxed);
     egui::Window::new("Room diagnostics").show(egui_ctx.ctx(), |ui| {
@@ -31,7 +30,6 @@ fn update_ui_system(
         ui.label(format!("Connection state: {:?}", connection_state));
         ui.label(format!("Current room: {:?}", current_room.room_id));
         ui.label(format!("Hovered tile: {:?}", hovered.axial));
-        ui.label(format!("Look at room: {:?}", lat_room.id));
     });
 }
 
