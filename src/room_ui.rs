@@ -4,7 +4,10 @@ use crate::{
     terrain::CurrentRoom,
 };
 use bevy::{diagnostic::Diagnostics, prelude::*};
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{
+    egui::{self, Ui},
+    EguiContext,
+};
 
 #[derive(Debug, Default)]
 struct Diag {
@@ -33,6 +36,31 @@ fn update_ui_system(
     });
 }
 
+fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
+    ui.columns(1, |uis| {
+        let ui = &mut uis[0];
+
+        ui.label(format!("ID: {}", this.id));
+        ui.label(format!("Room: {}", this.pos.room));
+        ui.label(format!("Pos: {}", this.pos.pos));
+        if let Some(hp) = this.hp.as_ref() {
+            ui.label(format!("Health: {}/{}", hp.value, hp.value_max));
+        }
+        if let Some(car) = this.carry.as_ref() {
+            ui.label(format!("Carrying: {}/{}", car.value, car.value_max));
+        }
+        if let Some(script) = this.script.as_ref() {
+            ui.label(format!("Script: {}", script.data));
+        }
+        if let Some(owner) = this.owner.as_ref() {
+            ui.label(format!("Owner: {}", owner.data));
+        }
+        if let Some(mine) = this.mine_intent.as_ref() {
+            ui.label(format!("Mining: {}", mine.target_id));
+        }
+    });
+}
+
 fn right_panel_system(
     egui_ctx: Res<EguiContext>,
     selected_entity: Res<SelectedEntity>,
@@ -42,11 +70,12 @@ fn right_panel_system(
 ) {
     egui::SidePanel::right("selected-entity")
         .min_width(250.)
+        .resizable(false)
         .show(egui_ctx.ctx(), |ui| {
             ui.heading("Selected Entity");
             if let Some(selected) = selected_entity.entity {
                 if let Ok(bot) = bot_q.get(selected) {
-                    ui.label(format!("{:#?}", bot));
+                    show_bot(bot, ui);
                 } else if let Ok(structure) = stu_q.get(selected) {
                     ui.label(format!("{:#?}", structure));
                 } else if let Ok(resource) = res_q.get(selected) {
