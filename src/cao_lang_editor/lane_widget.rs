@@ -107,12 +107,13 @@ pub fn lane_ui(
                 if resp.hovered() {
                     *dst_col_row = Some((lane_index, dst_row));
                 }
-            });
+                resp
+            })
         });
     if lane.name.is_some() {
         // restore the lane name
         lane.name = Some(name);
     }
 
-    response
+    response.map(|x| x.response)
 }

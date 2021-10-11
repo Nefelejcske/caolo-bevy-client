@@ -35,35 +35,23 @@ fn update_ui_system(
     });
 }
 
-fn selected_entity_window_system(
+fn right_panel_system(
     egui_ctx: Res<EguiContext>,
     selected_entity: Res<SelectedEntity>,
-    // FIXME
-    // add data to the window...
-    cao_id_q: Query<&crate::cao_sim_client::SimEntityId>,
     bot_q: Query<&crate::cao_sim_client::cao_sim_model::Bot>,
     res_q: Query<&crate::cao_sim_client::cao_sim_model::Resource>,
     stu_q: Query<&crate::cao_sim_client::cao_sim_model::Structure>,
 ) {
-    egui::Window::new("Selected Entity")
-        .default_height(750.)
+    egui::SidePanel::right("selected-entity")
+        .min_width(250.)
         .show(egui_ctx.ctx(), |ui| {
+            ui.heading("Selected Entity");
             if let Some(selected) = selected_entity.entity {
-                ui.label(format!("EntityID: {:?}", selected));
-
-                if let Ok(id) = cao_id_q.get(selected) {
-                    ui.label(format!("Sim-ID: {:#x}", id.0));
-                }
-
                 if let Ok(bot) = bot_q.get(selected) {
                     ui.label(format!("{:#?}", bot));
-                }
-
-                if let Ok(structure) = stu_q.get(selected) {
+                } else if let Ok(structure) = stu_q.get(selected) {
                     ui.label(format!("{:#?}", structure));
-                }
-
-                if let Ok(resource) = res_q.get(selected) {
+                } else if let Ok(resource) = res_q.get(selected) {
                     ui.label(format!("{:#?}", resource));
                 }
             }
@@ -93,7 +81,7 @@ impl Plugin for RoomUiPlugin {
                     .with_system(
                         update_ui_system
                             .system()
-                            .chain(selected_entity_window_system.system())
+                            .chain(right_panel_system.system())
                             .chain(diagnostics_ui_system.system()),
                     ),
             )
