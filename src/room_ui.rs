@@ -59,6 +59,14 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
         if let Some(mine) = this.mine_intent.as_ref() {
             ui.label(format!("Mining: {}", mine.target_id));
         }
+        if let Some(decay) = this.decay.as_ref() {
+            ui.label(format!(
+                r#"Decay:
+	HP amount: {}.
+	Time remaining: {}/{}"#,
+                decay.hp_amount, decay.time_remaining, decay.interval
+            ));
+        }
     });
 }
 
