@@ -40,6 +40,7 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
     ui.columns(1, |uis| {
         let ui = &mut uis[0];
 
+        ui.heading("Bot");
         ui.label(format!("ID: {}", this.id));
         ui.label(format!("Room: {}", this.pos.room));
         ui.label(format!("Pos: {}", this.pos.pos));
@@ -61,6 +62,21 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
     });
 }
 
+fn show_resource(this: &cao_sim_model::Resource, ui: &mut Ui) {
+    ui.columns(1, |uis| {
+        let ui = &mut uis[0];
+
+        ui.heading("Resource");
+        ui.label(format!("ID: {}", this.id));
+        ui.label(format!("Room: {}", this.pos.room));
+        ui.label(format!("Pos: {}", this.pos.pos));
+        ui.label(format!(
+            "Energy: {}/{}",
+            this.resource_type.energy.value, this.resource_type.energy.value_max
+        ));
+    });
+}
+
 fn right_panel_system(
     egui_ctx: Res<EguiContext>,
     selected_entity: Res<SelectedEntity>,
@@ -79,7 +95,7 @@ fn right_panel_system(
                 } else if let Ok(structure) = stu_q.get(selected) {
                     ui.label(format!("{:#?}", structure));
                 } else if let Ok(resource) = res_q.get(selected) {
-                    ui.label(format!("{:#?}", resource));
+                    show_resource(resource, ui);
                 }
             }
         });
