@@ -62,6 +62,43 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
     });
 }
 
+fn show_structure(this: &cao_sim_model::Structure, ui: &mut Ui) {
+    ui.columns(1, |uis| {
+        let ui = &mut uis[0];
+
+        ui.heading("Structure");
+        ui.label(format!("ID: {}", this.id));
+        ui.label(format!("Room: {}", this.pos.room));
+        ui.label(format!("Pos: {}", this.pos.pos));
+        ui.label(format!("Health: {}/{}", this.hp.value, this.hp.value_max));
+        if let Some(owner) = this.owner.as_ref() {
+            ui.label(format!("Owner: {}", owner.data));
+        }
+        match &this.structure_type {
+            cao_sim_model::StructureType::Spawn(s) => {
+                if s.time_to_spawn > 0 {
+                    ui.label(format!("Time to spawn: {}", s.time_to_spawn));
+                    ui.label(format!("Spawning: {}", s.spawning));
+                }
+                ui.label(format!(
+                    "Spawn queue: [{}]",
+                    s.spawn_queue
+                        .iter()
+                        .map(|x| format!("{}", x))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+        if let Some(energy) = &this.energy {
+            ui.label(format!("Energy: {}/{}", energy.value, energy.value_max));
+        }
+        if let Some(energy) = &this.energy_regen {
+            ui.label(format!("Energy Regen: {}", energy));
+        }
+    });
+}
+
 fn show_resource(this: &cao_sim_model::Resource, ui: &mut Ui) {
     ui.columns(1, |uis| {
         let ui = &mut uis[0];
@@ -93,7 +130,7 @@ fn right_panel_system(
                 if let Ok(bot) = bot_q.get(selected) {
                     show_bot(bot, ui);
                 } else if let Ok(structure) = stu_q.get(selected) {
-                    ui.label(format!("{:#?}", structure));
+                    show_structure(structure, ui);
                 } else if let Ok(resource) = res_q.get(selected) {
                     show_resource(resource, ui);
                 }

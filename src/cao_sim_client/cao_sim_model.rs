@@ -125,26 +125,24 @@ pub struct Decay {
     pub time_remaining: i64,
 }
 
-#[derive(Default, Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[serde(default)]
 pub struct Structure {
     pub id: u64,
     pub pos: EntityPosition,
     pub hp: BoundedValue,
-    pub energy: BoundedValue,
-    pub energy_regen: i64,
-    pub owner: Owner,
+    pub energy: Option<BoundedValue>,
+    pub energy_regen: Option<i64>,
+    pub owner: Option<Owner>,
     #[serde(rename = "StructureType")]
     pub structure_type: StructureType,
 }
 
-#[derive(Default, Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[serde(default)]
-pub struct StructureType {
+pub enum StructureType {
     #[serde(rename = "Spawn")]
-    pub spawn: Spawn,
+    Spawn(Spawn),
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize)]
