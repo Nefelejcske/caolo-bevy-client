@@ -21,7 +21,7 @@ mod assets {
     }
 }
 
-fn laser_animation_system(
+fn mining_animation_system(
     time: Res<Time>,
     texture_atlases: Res<Assets<TextureAtlas>>,
     mut query: Query<(&mut Timer, &mut TextureAtlasSprite, &Handle<TextureAtlas>)>,
@@ -101,7 +101,7 @@ fn handle_mining_system(
     }
 }
 
-fn setup(
+fn setup_system(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut rendering_assets: ResMut<assets::MiningLaserRenderingAssets>,
@@ -118,11 +118,11 @@ pub struct MiningPlugin;
 
 impl Plugin for MiningPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_startup_system(setup.system())
+        app.add_startup_system(setup_system.system())
             .add_system_set(
                 SystemSet::on_update(crate::AppState::Room)
                     .with_system(handle_mining_system.system())
-                    .with_system(laser_animation_system.system())
+                    .with_system(mining_animation_system.system())
                     .with_system(cleanup_system.system())
                     .with_system(move_icon_with_cam.system()),
             )
