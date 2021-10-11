@@ -5,7 +5,7 @@ pub struct GetLayoutQuery {
     pub radius: i32,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "ty", content = "payload")]
 pub enum Message {
@@ -13,7 +13,7 @@ pub enum Message {
     Terrain(Option<TerrainPayload>),
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerrainPayload {
     pub room_id: AxialPos,
@@ -29,7 +29,7 @@ pub enum TerrainTy {
     Bridge,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct EntitiesPayload {
@@ -40,7 +40,7 @@ pub struct EntitiesPayload {
     pub resources: Vec<Resource>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Eq, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize, Eq, Hash)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityPosition {
@@ -65,7 +65,7 @@ impl std::fmt::Display for AxialPos {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Bot {
@@ -82,19 +82,19 @@ pub struct Bot {
     pub dropoff_intent: Option<DropoffIntent>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DropoffIntent {
     pub target_id: u64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MineIntent {
     pub target_id: u64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct BoundedValue {
@@ -102,21 +102,21 @@ pub struct BoundedValue {
     pub value_max: i64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
 pub struct Script {
     pub data: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Owner {
     pub data: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Decay {
@@ -125,7 +125,7 @@ pub struct Decay {
     pub time_remaining: i64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Structure {
@@ -139,7 +139,7 @@ pub struct Structure {
     pub structure_type: StructureType,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct StructureType {
@@ -147,7 +147,7 @@ pub struct StructureType {
     pub spawn: Spawn,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Spawn {
@@ -156,7 +156,7 @@ pub struct Spawn {
     pub spawn_queue: Vec<u64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct Resource {
@@ -166,7 +166,7 @@ pub struct Resource {
     pub resource_type: ResourceType,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub struct ResourceType {
