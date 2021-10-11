@@ -1,5 +1,5 @@
 use crate::{
-    cao_sim_client::{ConnectionStateRes, NewEntities},
+    cao_sim_client::{cao_sim_model, ConnectionStateRes, NewEntities},
     room_interaction::{HoveredTile, LookAtRoom, SelectedEntity},
     terrain::CurrentRoom,
 };
@@ -38,9 +38,9 @@ fn update_ui_system(
 fn right_panel_system(
     egui_ctx: Res<EguiContext>,
     selected_entity: Res<SelectedEntity>,
-    bot_q: Query<&crate::cao_sim_client::cao_sim_model::Bot>,
-    res_q: Query<&crate::cao_sim_client::cao_sim_model::Resource>,
-    stu_q: Query<&crate::cao_sim_client::cao_sim_model::Structure>,
+    bot_q: Query<&cao_sim_model::Bot>,
+    res_q: Query<&cao_sim_model::Resource>,
+    stu_q: Query<&cao_sim_model::Structure>,
 ) {
     egui::SidePanel::right("selected-entity")
         .min_width(250.)
