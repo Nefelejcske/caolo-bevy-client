@@ -41,32 +41,54 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
         let ui = &mut uis[0];
 
         ui.heading("Bot");
-        ui.label(format!("ID: {}", this.id));
-        ui.label(format!("Room: {}", this.pos.room));
-        ui.label(format!("Pos: {}", this.pos.pos));
-        if let Some(hp) = this.hp.as_ref() {
-            ui.label(format!("Health: {}/{}", hp.value, hp.value_max));
-        }
-        if let Some(car) = this.carry.as_ref() {
-            ui.label(format!("Carrying: {}/{}", car.value, car.value_max));
-        }
-        if let Some(script) = this.script.as_ref() {
-            ui.label(format!("Script: {}", script.data));
-        }
-        if let Some(owner) = this.owner.as_ref() {
-            ui.label(format!("Owner: {}", owner.data));
-        }
-        if let Some(mine) = this.mine_intent.as_ref() {
-            ui.label(format!("Mining: {}", mine.target_id));
-        }
-        if let Some(decay) = this.decay.as_ref() {
-            ui.label(format!(
-                r#"Decay:
-	HP amount: {}.
-	Time remaining: {}/{}"#,
-                decay.hp_amount, decay.time_remaining, decay.interval
-            ));
-        }
+        egui::Grid::new("current_bot").striped(true).show(ui, |ui| {
+            ui.label("ID");
+            ui.label(this.id.to_string());
+            ui.end_row();
+            ui.label("Room");
+            ui.label(this.pos.room.to_string());
+            ui.end_row();
+            ui.label("Pos");
+            ui.label(this.pos.pos.to_string());
+            ui.end_row();
+            if let Some(hp) = this.hp.as_ref() {
+                ui.label("Health");
+                ui.label(format!("{}/{}", hp.value, hp.value_max));
+                ui.end_row();
+            }
+            if let Some(car) = this.carry.as_ref() {
+                ui.label("Carrying");
+                ui.label(format!("{}/{}", car.value, car.value_max));
+                ui.end_row();
+            }
+            if let Some(script) = this.script.as_ref() {
+                ui.label("Script");
+                ui.label(script.data.as_str());
+                ui.end_row();
+            }
+            if let Some(owner) = this.owner.as_ref() {
+                ui.label("Owner");
+                ui.label(owner.data.as_str());
+                ui.end_row();
+            }
+            if let Some(mine) = this.mine_intent.as_ref() {
+                ui.label("Mining");
+                ui.label(mine.target_id.to_string());
+                ui.end_row();
+            }
+            if let Some(decay) = this.decay.as_ref() {
+                ui.label("Decay");
+                egui::Grid::new("current_bot_decay").show(ui, |ui| {
+                    ui.label("Decay Amount");
+                    ui.label(decay.hp_amount.to_string());
+                    ui.end_row();
+                    ui.label("Time remaining");
+                    ui.label(format!("{}/{}", decay.time_remaining, decay.interval));
+                    ui.end_row();
+                });
+                ui.end_row();
+            }
+        });
     });
 }
 
