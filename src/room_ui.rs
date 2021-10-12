@@ -37,111 +37,128 @@ fn update_ui_system(
 }
 
 fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
-    ui.columns(1, |uis| {
-        let ui = &mut uis[0];
-
-        ui.heading("Bot");
-        egui::Grid::new("current_bot").striped(true).show(ui, |ui| {
-            ui.label("ID");
-            ui.label(this.id.to_string());
+    ui.heading("Bot");
+    ui.end_row();
+    ui.label("ID");
+    ui.label(this.id.to_string());
+    ui.end_row();
+    ui.label("Room");
+    ui.label(this.pos.room.to_string());
+    ui.end_row();
+    ui.label("Pos");
+    ui.label(this.pos.pos.to_string());
+    ui.end_row();
+    if let Some(hp) = this.hp.as_ref() {
+        ui.label("Health");
+        ui.label(format!("{}/{}", hp.value, hp.value_max));
+        ui.end_row();
+    }
+    if let Some(car) = this.carry.as_ref() {
+        ui.label("Carrying");
+        ui.label(format!("{}/{}", car.value, car.value_max));
+        ui.end_row();
+    }
+    if let Some(script) = this.script.as_ref() {
+        ui.label("Script");
+        ui.label(script.data.as_str());
+        ui.end_row();
+    }
+    if let Some(owner) = this.owner.as_ref() {
+        ui.label("Owner");
+        ui.label(owner.data.as_str());
+        ui.end_row();
+    }
+    if let Some(mine) = this.mine_intent.as_ref() {
+        ui.label("Mining");
+        ui.label(mine.target_id.to_string());
+        ui.end_row();
+    }
+    if let Some(decay) = this.decay.as_ref() {
+        ui.label("Decay");
+        egui::Grid::new("current_bot_decay").show(ui, |ui| {
+            ui.label("Decay Amount");
+            ui.label(decay.hp_amount.to_string());
             ui.end_row();
-            ui.label("Room");
-            ui.label(this.pos.room.to_string());
+            ui.label("Time remaining");
+            ui.label(format!("{}/{}", decay.time_remaining, decay.interval));
             ui.end_row();
-            ui.label("Pos");
-            ui.label(this.pos.pos.to_string());
-            ui.end_row();
-            if let Some(hp) = this.hp.as_ref() {
-                ui.label("Health");
-                ui.label(format!("{}/{}", hp.value, hp.value_max));
-                ui.end_row();
-            }
-            if let Some(car) = this.carry.as_ref() {
-                ui.label("Carrying");
-                ui.label(format!("{}/{}", car.value, car.value_max));
-                ui.end_row();
-            }
-            if let Some(script) = this.script.as_ref() {
-                ui.label("Script");
-                ui.label(script.data.as_str());
-                ui.end_row();
-            }
-            if let Some(owner) = this.owner.as_ref() {
-                ui.label("Owner");
-                ui.label(owner.data.as_str());
-                ui.end_row();
-            }
-            if let Some(mine) = this.mine_intent.as_ref() {
-                ui.label("Mining");
-                ui.label(mine.target_id.to_string());
-                ui.end_row();
-            }
-            if let Some(decay) = this.decay.as_ref() {
-                ui.label("Decay");
-                egui::Grid::new("current_bot_decay").show(ui, |ui| {
-                    ui.label("Decay Amount");
-                    ui.label(decay.hp_amount.to_string());
-                    ui.end_row();
-                    ui.label("Time remaining");
-                    ui.label(format!("{}/{}", decay.time_remaining, decay.interval));
-                    ui.end_row();
-                });
-                ui.end_row();
-            }
         });
-    });
+        ui.end_row();
+    }
 }
 
 fn show_structure(this: &cao_sim_model::Structure, ui: &mut Ui) {
-    ui.columns(1, |uis| {
-        let ui = &mut uis[0];
-
-        ui.heading("Structure");
-        ui.label(format!("ID: {}", this.id));
-        ui.label(format!("Room: {}", this.pos.room));
-        ui.label(format!("Pos: {}", this.pos.pos));
-        ui.label(format!("Health: {}/{}", this.hp.value, this.hp.value_max));
-        if let Some(owner) = this.owner.as_ref() {
-            ui.label(format!("Owner: {}", owner.data));
-        }
-        match &this.structure_type {
-            cao_sim_model::StructureType::Spawn(s) => {
-                if s.time_to_spawn > 0 {
-                    ui.label(format!("Time to spawn: {}", s.time_to_spawn));
-                    ui.label(format!("Spawning: {}", s.spawning));
-                }
-                ui.label(format!(
-                    "Spawn queue: [{}]",
-                    s.spawn_queue
-                        .iter()
-                        .map(|x| format!("{}", x))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+    ui.heading("Structure");
+    ui.end_row();
+    ui.label("ID");
+    ui.label(format!("{}", this.id));
+    ui.end_row();
+    ui.label("Room");
+    ui.label(format!("{}", this.pos.room));
+    ui.end_row();
+    ui.label("Pos");
+    ui.label(format!("{}", this.pos.pos));
+    ui.end_row();
+    ui.label("Health");
+    ui.label(format!("{}/{}", this.hp.value, this.hp.value_max));
+    ui.end_row();
+    if let Some(owner) = this.owner.as_ref() {
+        ui.label("Owner");
+        ui.label(format!("{}", owner.data));
+        ui.end_row();
+    }
+    match &this.structure_type {
+        cao_sim_model::StructureType::Spawn(s) => {
+            if s.time_to_spawn > 0 {
+                ui.label("Time to spawn");
+                ui.label(format!("{}", s.time_to_spawn));
+                ui.end_row();
+                ui.label("Spawning");
+                ui.label(format!("{}", s.spawning));
+                ui.end_row();
             }
+            ui.label("Spawn queue");
+            ui.label(format!(
+                "[{}]",
+                s.spawn_queue
+                    .iter()
+                    .map(|x| format!("{}", x))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            ui.end_row();
         }
-        if let Some(energy) = &this.energy {
-            ui.label(format!("Energy: {}/{}", energy.value, energy.value_max));
-        }
-        if let Some(energy) = &this.energy_regen {
-            ui.label(format!("Energy Regen: {}", energy));
-        }
-    });
+    }
+    if let Some(energy) = &this.energy {
+        ui.label("Energy");
+        ui.label(format!("{}/{}", energy.value, energy.value_max));
+        ui.end_row();
+    }
+    if let Some(energy) = &this.energy_regen {
+        ui.label("Energy Regen");
+        ui.label(format!("{}", energy));
+        ui.end_row();
+    }
 }
 
 fn show_resource(this: &cao_sim_model::Resource, ui: &mut Ui) {
-    ui.columns(1, |uis| {
-        let ui = &mut uis[0];
-
-        ui.heading("Resource");
-        ui.label(format!("ID: {}", this.id));
-        ui.label(format!("Room: {}", this.pos.room));
-        ui.label(format!("Pos: {}", this.pos.pos));
-        ui.label(format!(
-            "Energy: {}/{}",
-            this.resource_type.energy.value, this.resource_type.energy.value_max
-        ));
-    });
+    ui.heading("Resource");
+    ui.end_row();
+    ui.label("ID");
+    ui.label(format!("{}", this.id));
+    ui.end_row();
+    ui.label("Room");
+    ui.label(format!("{}", this.pos.room));
+    ui.end_row();
+    ui.label("Pos");
+    ui.label(format!("{}", this.pos.pos));
+    ui.end_row();
+    ui.label("Energy");
+    ui.label(format!(
+        "{}/{}",
+        this.resource_type.energy.value, this.resource_type.energy.value_max
+    ));
+    ui.end_row();
 }
 
 fn right_panel_system(
@@ -157,13 +174,21 @@ fn right_panel_system(
         .show(egui_ctx.ctx(), |ui| {
             ui.heading("Selected Entity");
             if let Some(selected) = selected_entity.entity {
-                if let Ok(bot) = bot_q.get(selected) {
-                    show_bot(bot, ui);
-                } else if let Ok(structure) = stu_q.get(selected) {
-                    show_structure(structure, ui);
-                } else if let Ok(resource) = res_q.get(selected) {
-                    show_resource(resource, ui);
-                }
+                ui.columns(1, |uis| {
+                    let ui = &mut uis[0];
+
+                    egui::Grid::new("current_structure")
+                        .striped(true)
+                        .show(ui, |ui| {
+                            if let Ok(bot) = bot_q.get(selected) {
+                                show_bot(bot, ui);
+                            } else if let Ok(structure) = stu_q.get(selected) {
+                                show_structure(structure, ui);
+                            } else if let Ok(resource) = res_q.get(selected) {
+                                show_resource(resource, ui);
+                            }
+                        });
+                });
             }
         });
 }
