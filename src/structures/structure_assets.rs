@@ -5,7 +5,7 @@ use bevy::render::{pipeline::PipelineDescriptor, renderer::RenderResources};
 #[derive(Default)]
 pub struct StructureRenderingAssets {
     pub pipeline: Handle<PipelineDescriptor>,
-    pub mesh: Handle<Mesh>,
+    pub spawn_mesh: Handle<Mesh>,
 }
 
 #[derive(RenderResources, Default, TypeUuid)]

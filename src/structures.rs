@@ -30,10 +30,11 @@ fn build_structure(
 
     cmd.insert_bundle((Structure,)).with_children(|c| {
         c.spawn_bundle(MeshBundle {
-            mesh: assets.mesh.clone(),
+            mesh: assets.spawn_mesh.clone(),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 assets.pipeline.clone(),
             )]),
+            transform: Transform::from_scale(Vec3::splat(0.5)),
             ..Default::default()
         })
         .insert(material);
@@ -93,7 +94,6 @@ fn on_structure_move_system(
 fn setup_system(
     asset_server: Res<AssetServer>,
     mut pipelines: ResMut<Assets<bevy::render::pipeline::PipelineDescriptor>>,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut render_graph: ResMut<render_graph::RenderGraph>,
     mut structure_rendering_assets: ResMut<structure_assets::StructureRenderingAssets>,
 ) {
@@ -110,15 +110,11 @@ fn setup_system(
     render_graph
         .add_node_edge("structure_material", render_graph::base::node::MAIN_PASS)
         .unwrap();
-    let mesh = meshes.add(Mesh::from(shape::Torus {
-        radius: 0.5,
-        ring_radius: 0.3,
-        subdivisions_segments: 8,
-        subdivisions_sides: 8,
-    }));
+
+    let spawn_mesh = asset_server.load("meshes/structures.glb#Mesh0/Primitive0");
     *structure_rendering_assets = structure_assets::StructureRenderingAssets {
         pipeline: pipeline_handle,
-        mesh,
+        spawn_mesh,
     };
 }
 

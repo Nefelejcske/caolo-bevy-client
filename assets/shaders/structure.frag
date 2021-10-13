@@ -11,5 +11,5 @@ layout(set = 2, binding = 1) uniform StructureMaterial_time {
 };
 
 void main() {
-    o_Target = Color;
+    o_Target = Color * vec4(V_Uv, V_Uv.x, 1.);
 }
