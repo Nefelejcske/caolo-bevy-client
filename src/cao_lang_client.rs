@@ -30,7 +30,7 @@ async fn get_schema() -> CaoLangSchema {
         .recv_json()
         .await
         .expect("Failed to get schema");
-    debug!("Got schema payload {:#?}", payload);
+    trace!("Got schema payload {:#?}", payload);
     let mut result = CaoLangSchema(payload);
     let default_cards = cao_lang::compiler::card_description::get_instruction_descriptions();
     result.0.extend(default_cards.iter().map(
