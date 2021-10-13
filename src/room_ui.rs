@@ -107,8 +107,8 @@ fn show_structure(this: &cao_sim_model::Structure, ui: &mut Ui) {
         ui.label(format!("{}", owner.data));
         ui.end_row();
     }
-    match &this.structure_type {
-        cao_sim_model::StructureType::Spawn(s) => {
+    match &this.structure_body {
+        cao_sim_model::StructureBody::Spawn(s) => {
             if s.time_to_spawn > 0 {
                 ui.label("Time to spawn");
                 ui.label(format!("{}", s.time_to_spawn));

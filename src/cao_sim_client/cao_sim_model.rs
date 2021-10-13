@@ -134,13 +134,13 @@ pub struct Structure {
     pub energy: Option<BoundedValue>,
     pub energy_regen: Option<i64>,
     pub owner: Option<Owner>,
-    #[serde(rename = "StructureType")]
-    pub structure_type: StructureType,
+    #[serde(rename = "StructureBody")]
+    pub structure_body: StructureBody,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum StructureType {
+pub enum StructureBody {
     #[serde(rename = "Spawn")]
     Spawn(Spawn),
 }
