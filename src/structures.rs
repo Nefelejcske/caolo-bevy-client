@@ -18,7 +18,7 @@ pub struct Structure;
 
 pub struct StructuresPlugin;
 
-fn build_structure(
+fn build_structure_spawn(
     cmd: &mut EntityCommands,
     assets: &structure_assets::StructureRenderingAssets,
     materials: &mut Assets<structure_assets::StructureMaterial>,
@@ -29,12 +29,14 @@ fn build_structure(
     });
 
     cmd.insert_bundle((Structure,)).with_children(|c| {
+        let mut transform = Transform::from_scale(Vec3::splat(0.5));
+        transform.rotate(Quat::from_rotation_y(std::f32::consts::TAU / 4.));
         c.spawn_bundle(MeshBundle {
             mesh: assets.spawn_mesh.clone(),
             render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
                 assets.pipeline.clone(),
             )]),
-            transform: Transform::from_scale(Vec3::splat(0.5)),
+            transform,
             ..Default::default()
         })
         .insert(material);
@@ -65,7 +67,7 @@ fn on_new_entities_system(
         .filter(|e| e.ty == crate::cao_entities::EntityType::Structure)
     {
         let meta = q_meta.get(new_entity_event.id).unwrap();
-        build_structure(&mut cmd.entity(meta.id), &*assets, &mut *materials);
+        build_structure_spawn(&mut cmd.entity(meta.id), &*assets, &mut *materials);
     }
 }
 

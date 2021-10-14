@@ -335,7 +335,7 @@ fn on_new_terrain_system(
             while let Some((p, ty)) = stream.next().await {
                 let p = hex_axial_to_pixel(p.q as f32, p.r as f32);
                 let mut p = pos_2d_to_3d(p);
-                p.y -= 0.0001;
+                p.y -= std::f32::EPSILON;
 
                 let color = terrain2color(*ty);
 
@@ -350,7 +350,7 @@ fn on_new_terrain_system(
                     ys,
                     p,
                     color,
-                    0.95,
+                    1.0,
                     &mut vertices_a,
                     &mut indices,
                     &mut colors,
