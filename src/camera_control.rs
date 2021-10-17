@@ -153,7 +153,7 @@ fn setup(mut cmd: Commands) {
 
             let zoom = Zoom {
                 t: 0.5,
-                min: pos - z * 50.0,
+                min: pos - z * 65.0,
                 max: pos + z * 250.0,
             };
 
