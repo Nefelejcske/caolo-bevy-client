@@ -71,12 +71,14 @@ fn rig_input_system(
     mut rot_cd: ResMut<RotationCooldown>,
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
+    zoom_q: Query<&Zoom>,
     mut cam_rigs: Query<
         (
             &mut Transform,
             &mut TargetRotation,
             &Velocity,
             &DefaultPosition,
+            &Children,
         ),
         With<RoomCameraRigTag>,
     >,
@@ -85,7 +87,11 @@ fn rig_input_system(
     if rot_cd.t.just_finished() {
         rot_cd.cooling = false;
     }
-    for (mut tr, mut rot, v, default_pos) in cam_rigs.iter_mut() {
+    for (mut tr, mut rot, v, default_pos, children) in cam_rigs.iter_mut() {
+        let child_zoom = zoom_q.get(*children.first().expect("child")).unwrap();
+
+        let v = eerp(v.0, v.0 * 2.0, child_zoom.t); // the more zoomed in, the slower the pan velocity
+
         let mut dtranslation = Vec3::ZERO;
 
         let sideways = tr.local_x();
@@ -116,7 +122,7 @@ fn rig_input_system(
             }
         }
 
-        tr.translation += dtranslation.normalize_or_zero() * v.0 * time.delta_seconds();
+        tr.translation += dtranslation.normalize_or_zero() * v * time.delta_seconds();
         if rotated && !rot_cd.cooling {
             rot_cd.t.reset();
             rot_cd.cooling = true;
@@ -135,7 +141,7 @@ fn setup(mut cmd: Commands) {
 
     cmd.spawn()
         .insert_bundle((
-            Velocity(150.0),
+            Velocity(120.0),
             RoomCameraRigTag,
             outertr,
             GlobalTransform::default(),
