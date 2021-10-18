@@ -131,7 +131,7 @@ fn handle_message(
             info!("Terrain request returned null");
         }
         cao_sim_model::Message::Entities(ent) => {
-            trace!("New entities, time: {}, room: {:?}", ent.time, ent.room_id);
+            debug!("New entities, time: {}, room: {:?}", ent.time, ent.room_id);
             entities_sender
                 .send(NewEntities(Arc::new(ent)))
                 .with_context(|| "Failed to send new entities")?;
