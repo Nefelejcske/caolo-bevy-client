@@ -15,7 +15,7 @@ mod terrain;
 
 use bevy::prelude::*;
 
-pub const API_BASE_URL: &str = "http://localhost:8000";
+pub const API_BASE_URL: &str = "http://localhost:8000/v1";
 pub const WS_BASE_URL: &str = "ws://localhost:8080";
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
