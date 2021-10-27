@@ -3,6 +3,12 @@ use cao_lang::{
     InputString,
 };
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteCompileError {
+    pub detail: String,
+}
+
 #[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaNode {

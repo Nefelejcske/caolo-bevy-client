@@ -6,7 +6,7 @@ use bevy_egui::{
 };
 use cao_lang::compiler::Lane;
 
-use super::{card_widget, drag_src, drop_target, CurrentCompileError, LaneIndex, LaneNames};
+use super::{card_widget, drag_src, drop_target, CurrentLocalCompileError, LaneIndex, LaneNames};
 
 pub fn lane_ui(
     lane: &mut Lane,
@@ -16,7 +16,7 @@ pub fn lane_ui(
     src_col_row: &mut Option<(LaneIndex, usize)>,
     dst_col_row: &mut Option<(LaneIndex, usize)>,
     dropped: &mut bool,
-    compile_error: &CurrentCompileError,
+    compile_error: &CurrentLocalCompileError,
     open: &mut bool,
 ) -> Option<Response> {
     let mut name = lane.name.as_mut().map(|x| mem::take(x)).unwrap_or_default();

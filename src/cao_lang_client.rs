@@ -4,6 +4,7 @@ use bevy::{
     prelude::*,
     tasks::{IoTaskPool, Task},
 };
+use cao_lang::compiler::CaoIr;
 use futures_lite::future;
 
 use crate::cao_lang_client::cao_lang_model::SchemaNode;
@@ -23,6 +24,37 @@ fn handle_tasks_system(
             commands.entity(e).remove::<Task<CaoLangSchema>>();
         }
     });
+}
+
+// TODO handle errors...
+pub async fn compile_program(program: CaoIr) -> Result<(), cao_lang_model::RemoteCompileError> {
+    let mut resp = loop {
+        let resp = surf::post(format!("{}/scripting/compile", crate::API_BASE_URL))
+            .body_json(&program)
+            .expect("failed to serialize program");
+        match resp.await {
+            Ok(resp) => break resp,
+            Err(err) => {
+                error!("Request send failed, retrying, err: {:?}", err);
+            }
+        }
+    };
+    match resp.status() {
+        surf::StatusCode::Ok => Ok(()),
+        surf::StatusCode::BadRequest => {
+            let body = resp
+                .body_json()
+                .await
+                .expect("Failed to get compilation error");
+
+            Err(body)
+        }
+        surf::StatusCode::UnprocessableEntity => todo!(),
+        _ => {
+            error!("Unexpected response {:?}", resp);
+            todo!()
+        }
+    }
 }
 
 async fn get_schema() -> CaoLangSchema {

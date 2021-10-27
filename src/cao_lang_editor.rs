@@ -1,7 +1,10 @@
 mod card_widget;
 mod lane_widget;
 
-use crate::cao_lang_client::{cao_lang_model::schema_to_card, CaoLangSchema};
+use crate::cao_lang_client::{
+    cao_lang_model::{schema_to_card, RemoteCompileError},
+    CaoLangSchema,
+};
 use bevy::{prelude::*, tasks::Task};
 use bevy_egui::{
     egui::{self, color, CursorIcon, Id, InnerResponse, LayerId, Order, Sense, Shape, Ui},
@@ -12,7 +15,11 @@ use futures_lite::future;
 
 pub struct CurrentProgram(pub CaoIr);
 pub struct LaneNames(pub Vec<String>);
-pub struct CurrentCompileError(pub Option<CompilationError>);
+pub struct CurrentLocalCompileError(pub Option<CompilationError>);
+pub struct CurrentRemoteCompileError(pub Option<RemoteCompileError>);
+
+type LocalCompileResult = Result<CaoIr, CompilationError>;
+type RemoteCompileResult = Result<(), RemoteCompileError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LaneIndex {
@@ -181,7 +188,8 @@ fn schema_ui(
 
 fn left_ui_system(
     egui_ctx: ResMut<EguiContext>, // exclusive ownership
-    compile_error: Res<CurrentCompileError>,
+    compile_error: Res<CurrentLocalCompileError>,
+    remote_compile_error: Res<CurrentRemoteCompileError>,
     mut ir: ResMut<CurrentProgram>,
 ) {
     egui::SidePanel::left("cao-lang-control").show(egui_ctx.ctx(), |ui| {
@@ -195,6 +203,16 @@ fn left_ui_system(
             }
         }
         ui.separator();
+        ui.heading("Remote Compilation result");
+        match remote_compile_error.0.as_ref() {
+            Some(err) => {
+                ui.colored_label(egui::color::Rgba::RED, err.detail.clone());
+            }
+            None => {
+                ui.colored_label(egui::color::Rgba::GREEN, "Success");
+            }
+        }
+        ui.separator();
 
         if ui.small_button("Add Lane").clicked() {
             ir.0.lanes.push(Default::default());
@@ -202,20 +220,39 @@ fn left_ui_system(
     });
 }
 
-fn compiler_result_system(
+fn remote_compile_result_system(
     mut cmd: Commands,
-    tasks: Query<(Entity, &mut Task<Result<(), CompilationError>>)>,
-    mut compile_error: ResMut<CurrentCompileError>,
+    tasks: Query<(Entity, &mut Task<RemoteCompileResult>)>,
+    mut compile_error: ResMut<CurrentRemoteCompileError>,
 ) {
     tasks.for_each_mut(|(e, mut task)| {
         if let Some(res) = future::block_on(future::poll_once(&mut *task)) {
             match res {
-                Ok(_) => {
+                Ok(_) => compile_error.0 = None,
+                Err(err) => compile_error.0 = Some(err),
+            }
+            cmd.entity(e).despawn_recursive();
+        }
+    });
+}
+
+fn compiler_result_system(
+    mut cmd: Commands,
+    tasks: Query<(Entity, &mut Task<LocalCompileResult>)>,
+    mut compile_error: ResMut<CurrentLocalCompileError>,
+    pool: Res<bevy::tasks::IoTaskPool>,
+) {
+    tasks.for_each_mut(|(e, mut task)| {
+        if let Some(res) = future::block_on(future::poll_once(&mut *task)) {
+            match res {
+                Ok(ir) => {
+                    debug!("Sending IR to server");
+                    cmd.spawn()
+                        .insert(pool.spawn(crate::cao_lang_client::compile_program(ir)));
+
                     compile_error.0 = None;
                 }
-                Err(err) => {
-                    compile_error.0 = Some(err);
-                }
+                Err(err) => compile_error.0 = Some(err),
             }
             cmd.entity(e).despawn_recursive();
         }
@@ -226,7 +263,13 @@ fn compiler_result_system(
 fn compiler_system(
     mut cmd: Commands,
     ir: Res<CurrentProgram>,
-    tasks: Query<(), With<Task<Result<(), CompilationError>>>>,
+    tasks: Query<
+        (),
+        Or<(
+            With<Task<LocalCompileResult>>,
+            With<Task<RemoteCompileResult>>,
+        )>,
+    >,
     pool: Res<bevy::tasks::AsyncComputeTaskPool>,
 ) {
     if tasks.iter().next().is_some() {
@@ -237,7 +280,7 @@ fn compiler_system(
     let ir = ir.0.clone();
     let task = pool.spawn(async move {
         let result = cao_lang::compiler::compile(&ir, None);
-        result.map(|_| {})
+        result.map(|_| ir)
     });
 
     cmd.spawn().insert(task);
@@ -258,7 +301,7 @@ fn editor_ui_system(
     mut ir: ResMut<CurrentProgram>,
     lane_names: Res<LaneNames>,
     mut on_drop: EventWriter<OnCardDrop>,
-    compile_error: Res<CurrentCompileError>,
+    compile_error: Res<CurrentLocalCompileError>,
 ) {
     let mut src_col_row = None;
     let mut dst_col_row = None;
@@ -310,7 +353,8 @@ impl Plugin for CaoLangEditorPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<OnCardDrop>()
             .insert_resource(LaneNames(Vec::with_capacity(4)))
-            .insert_resource(CurrentCompileError(None))
+            .insert_resource(CurrentLocalCompileError(None))
+            .insert_resource(CurrentRemoteCompileError(None))
             .insert_resource(CurrentProgram(CaoIr {
                 lanes: vec![cao_lang::compiler::Lane::default().with_name("Main")],
             }))
@@ -321,6 +365,7 @@ impl Plugin for CaoLangEditorPlugin {
                     .with_system(update_lane_names_system.system())
                     .with_system(compiler_system.system())
                     .with_system(compiler_result_system.system())
+                    .with_system(remote_compile_result_system.system())
                     .with_system(editor_ui_system.system()),
             );
     }
