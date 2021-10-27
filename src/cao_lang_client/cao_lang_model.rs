@@ -55,6 +55,7 @@ pub fn schema_to_card(node: &SchemaNode) -> Card {
             "IfFalse" => Card::IfFalse(Default::default()),
             "Jump" => Card::Jump(Default::default()),
             "SetGlobalVar" => Card::SetGlobalVar(Default::default()),
+            "SetLocalVar" => Card::SetVar(Default::default()),
             "ReadVar" => Card::ReadVar(Default::default()),
             "Repeat" => Card::Repeat(Default::default()),
             "While" => Card::While(Default::default()),
