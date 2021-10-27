@@ -271,11 +271,18 @@ fn compiler_system(
         )>,
     >,
     pool: Res<bevy::tasks::AsyncComputeTaskPool>,
+    mut last_key: Local<serde_hashkey::Key>,
 ) {
     if tasks.iter().next().is_some() {
         // compilation task is in progress
         return;
     }
+    let key = serde_hashkey::to_key(&ir.0).unwrap();
+    if key == *last_key {
+        // the hash of the IR is the same as the last
+        return;
+    }
+    *last_key = key;
 
     let ir = ir.0.clone();
     let task = pool.spawn(async move {

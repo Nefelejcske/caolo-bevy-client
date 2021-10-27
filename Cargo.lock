@@ -1069,6 +1069,7 @@ dependencies = [
  "futures-lite",
  "lru",
  "serde",
+ "serde-hashkey",
  "serde_json",
  "smallvec",
  "surf",
@@ -3862,6 +3863,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f12d06de37cf59146fbdecab66aa99f9fe4f78722e3607577a5375d66bd0c913"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-hashkey"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8522017d4ffbdae83d9aaecc08e9dbff31c6e3044e8137397b4a008b2c37a27"
+dependencies = [
+ "num-traits",
+ "ordered-float",
+ "serde",
 ]
 
 [[package]]
