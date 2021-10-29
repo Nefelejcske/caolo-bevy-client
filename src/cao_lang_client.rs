@@ -7,7 +7,7 @@ use bevy::{
 use cao_lang::compiler::CaoIr;
 use futures_lite::future;
 
-use crate::cao_lang_client::cao_lang_model::SchemaNode;
+use crate::{account::AuthToken, cao_lang_client::cao_lang_model::SchemaNode};
 
 pub struct CaoLangSchema(pub Vec<cao_lang_model::SchemaNode>);
 
@@ -27,7 +27,32 @@ fn handle_tasks_system(
 }
 
 // TODO handle errors...
-pub async fn compile_program(program: CaoIr) -> Result<(), cao_lang_model::RemoteCompileError> {
+pub async fn fetch_my_programs(token: AuthToken) -> Result<(), ()> {
+    let resp = surf::get(format!("{}/scripting/my-programs", crate::API_BASE_URL))
+        .header("Authorization", token)
+        .await;
+    todo!()
+}
+
+pub type CreateNewProgramResult = Result<(), cao_lang_model::CreateProgramError>;
+pub async fn create_new_program(name: String, token: AuthToken) -> CreateNewProgramResult {
+    #[derive(serde::Serialize)]
+    struct Payload {
+        name: String,
+    }
+    let resp = surf::post(format!("{}/scripting/create-program", crate::API_BASE_URL))
+        .header("Authorization", token)
+        .body_json(&Payload { name })
+        .unwrap()
+        .await;
+
+    dbg!(resp);
+    todo!()
+}
+
+// TODO handle errors...
+pub type CompileProgramResult = Result<(), cao_lang_model::RemoteCompileError>;
+pub async fn compile_program(program: CaoIr) -> CompileProgramResult {
     let mut resp = loop {
         let resp = surf::post(format!("{}/scripting/compile", crate::API_BASE_URL))
             .body_json(&program)

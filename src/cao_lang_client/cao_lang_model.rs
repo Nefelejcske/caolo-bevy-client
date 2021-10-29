@@ -2,6 +2,7 @@ use cao_lang::{
     compiler::{CallNode, Card},
     InputString,
 };
+use thiserror::Error;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,11 @@ pub struct SchemaNode {
     #[serde(rename = "outputs")]
     pub output: Vec<String>,
     pub properties: Vec<String>,
+}
+
+
+#[derive(serde::Deserialize, Debug, Error)]
+pub enum CreateProgramError {
 }
 
 pub fn schema_to_card(node: &SchemaNode) -> Card {

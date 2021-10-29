@@ -36,6 +36,17 @@ fn update_ui_system(
     });
 }
 
+fn decode_uuid(b64id: &str) -> uuid::Uuid {
+    let mut payload = [0u8; 16];
+    base64::decode_config_slice(
+        b64id.as_bytes(),
+        base64::Config::new(base64::CharacterSet::Standard, true),
+        &mut payload,
+    )
+    .unwrap();
+    uuid::Uuid::from_bytes(payload)
+}
+
 fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
     ui.heading("Bot");
     ui.end_row();
@@ -59,13 +70,15 @@ fn show_bot(this: &cao_sim_model::Bot, ui: &mut Ui) {
         ui.end_row();
     }
     if let Some(script) = this.script.as_ref() {
+        let id = decode_uuid(script.data.as_str());
         ui.label("Script");
-        ui.label(script.data.as_str());
+        ui.label(id.to_string());
         ui.end_row();
     }
     if let Some(owner) = this.owner.as_ref() {
+        let id = decode_uuid(owner.data.as_str());
         ui.label("Owner");
-        ui.label(owner.data.as_str());
+        ui.label(id.to_string());
         ui.end_row();
     }
     if let Some(mine) = this.mine_intent.as_ref() {

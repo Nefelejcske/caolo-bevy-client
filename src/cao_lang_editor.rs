@@ -1,9 +1,12 @@
 mod card_widget;
 mod lane_widget;
 
-use crate::cao_lang_client::{
-    cao_lang_model::{schema_to_card, RemoteCompileError},
-    CaoLangSchema,
+use crate::{
+    account::CurrentAuthToken,
+    cao_lang_client::{
+        cao_lang_model::{schema_to_card, RemoteCompileError},
+        CaoLangSchema,
+    },
 };
 use bevy::{prelude::*, tasks::Task};
 use bevy_egui::{
@@ -191,6 +194,10 @@ fn left_ui_system(
     compile_error: Res<CurrentLocalCompileError>,
     remote_compile_error: Res<CurrentRemoteCompileError>,
     mut ir: ResMut<CurrentProgram>,
+    mut new_name: Local<String>,
+    token: Res<CurrentAuthToken>,
+    pool: Res<bevy::tasks::IoTaskPool>,
+    mut cmd: Commands,
 ) {
     egui::SidePanel::left("cao-lang-control").show(egui_ctx.ctx(), |ui| {
         ui.heading("Compilation result");
@@ -216,6 +223,21 @@ fn left_ui_system(
 
         if ui.small_button("Add Lane").clicked() {
             ir.0.lanes.push(Default::default());
+        }
+
+        if let Some(token) = token.0.as_ref() {
+            ui.separator();
+            ui.text_edit_singleline(&mut *new_name);
+            if ui.small_button("New program").clicked() {
+                let name = std::mem::take(&mut *new_name);
+
+                // TODO: handle result
+                cmd.spawn()
+                    .insert(pool.spawn(crate::cao_lang_client::create_new_program(
+                        name,
+                        token.clone(),
+                    )));
+            }
         }
     });
 }

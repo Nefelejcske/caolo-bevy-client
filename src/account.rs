@@ -7,6 +7,7 @@ use bevy::{
 use futures_lite::future;
 
 pub type AuthToken = String;
+pub type AuthTokenRef<'a> = &'a str;
 pub type LoginError = String;
 pub type LoginResult<T> = Result<T, LoginError>;
 pub type LoginRequestTask = Task<LoginResult<AuthToken>>;
@@ -73,7 +74,7 @@ fn handle_tasks_system(
     tasks.for_each_mut(|(e, mut t)| {
         if let Some(res) = future::block_on(future::poll_once(&mut *t)) {
             match res {
-                Ok(t) => token.0 = Some(t),
+                Ok(t) => token.0 = Some(format!("Bearer {}", t)),
                 Err(e) => error.0 = Some(e),
             }
             cmd.entity(e).despawn_recursive();

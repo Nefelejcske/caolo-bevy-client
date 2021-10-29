@@ -1058,6 +1058,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-tungstenite",
+ "base64",
  "bevy",
  "bevy_egui",
  "cao-lang",
@@ -1077,6 +1078,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tungstenite",
+ "uuid",
 ]
 
 [[package]]
